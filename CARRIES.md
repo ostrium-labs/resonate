@@ -37,6 +37,7 @@ State is as of 2026-10-24. "Upstream" means a PR on `resonatehq/resonate`.
 | `sdk-rs`: reqwest without default TLS | `feat/sdk-rs-reqwest-default-feature` | [#1168](https://github.com/resonatehq/resonate/pull/1168) | Open, rebased | Loams embeds the Rust SDK with rustls only |
 | `resonate-auth`: jsonwebtoken 10.3 on aws-lc-rs; unsigned mode without the deprecated switch | `fix/auth-jsonwebtoken-10` | Not opened (needs the owner's approval) | Branch ready on `main` | GHSA-h395-gr6q-cpjc |
 | xtask: resolve the target directory through `cargo metadata` | in FW0 | Not opened | Carried | `porcupine` assumed `<workspace>/target`. It breaks under a configured `build.target-dir` or `CARGO_TARGET_DIR` |
+| FW3: `resonate-client` (typed Rust protocol client, HTTP and in process, retries, auth hook) and the public protocol entry in `resonate-gateway-http` (`protocol_router`, `handle_envelope`, `answer_envelope`, `ProtocolOptions`) | `fw3/resonate-client` | Not opened; both parts are upstreamable as they stand | PR into `loams/main` | Loams' Temporal gateway (`loams-temporal-resonate`) and `loams-worker` call Resonate only through this client (design 74 D1516), and `loams-durable` can mount the endpoint per tenant instead of keeping a copy of `handle_api` |
 
 Fork work items (Loams design 74 §7.4) are added to this table as their PRs
 merge into `loams/main`.
