@@ -379,14 +379,6 @@ async fn activity_lease(c: &mut Client) {
     nothing_routed(c, "nothing routed after fulfill");
 }
 
-/// Whether the store holds back a `resonate:delay` task's dispatch, as the
-/// specification says (`createPromise` in spec/02-abstract/state.lean). The
-/// SQL stores (SQLite, Postgres, MySQL) ignore the tag today and dispatch at
-/// create; the profile records that as a known gap.
-fn honours_delay(c: &Client) -> bool {
-    !matches!(c.name(), "sqlite" | "postgres" | "mysql")
-}
-
 async fn c_acquire(c: &mut Client, id: &str, version: i64, pid: &str) -> Res {
     c.task_acquire(id, version, pid, 10_000).await
 }
@@ -615,32 +607,17 @@ async fn retry_with_backoff(c: &mut Client) {
     expect_state(c, "attempt 2", p.promise(), "pending");
     let t = c.task_get(&a2).await;
     assert_eq!(t.task()["state"], json!("pending"), "[{}]", c.name());
-    let routed = if honours_delay(c) {
-        nothing_routed(c, "not dispatched before the delay");
-        c.tick(1_999).await;
-        nothing_routed(c, "not at delay - 1");
-        c.tick(1).await;
-        let routed = c.routed();
-        expect_routed(
-            c,
-            "dispatched at the delay",
-            &routed,
-            &[(TQ, "execute", &a2)],
-        );
-        routed
-    } else {
-        // Known gap: the SQL stores ignore the tag and dispatch at once.
-        let routed = c.routed();
-        expect_routed(
-            c,
-            "SQL store dispatches at once",
-            &routed,
-            &[(TQ, "execute", &a2)],
-        );
-        c.tick(2_000).await;
-        nothing_routed(c, "and not again at the delay");
-        routed
-    };
+    nothing_routed(c, "not dispatched before the delay");
+    c.tick(1_999).await;
+    nothing_routed(c, "not at delay - 1");
+    c.tick(1).await;
+    let routed = c.routed();
+    expect_routed(
+        c,
+        "dispatched at the delay",
+        &routed,
+        &[(TQ, "execute", &a2)],
+    );
     assert_eq!(
         routed[0].message["data"]["task"]["version"],
         json!(0),
@@ -703,15 +680,7 @@ async fn delay_gates_dispatch_not_claim(c: &mut Client) {
         .await,
         200,
     );
-    if !honours_delay(c) {
-        // Known gap: dispatched at create on the SQL stores.
-        expect_routed(
-            c,
-            "SQL store dispatches at once",
-            &c.routed(),
-            &[(TQ, "execute", &a)],
-        );
-    }
+    nothing_routed(c, "a delayed task is not dispatched at create");
     let early = c.task_acquire(&a, 0, "gw-a", 10_000).await;
     ex!(c, "acquire before the delay", &early, 200);
     // And the dispatch that was due is not sent for a task already held.
@@ -1353,13 +1322,69 @@ async fn id_rules(c: &mut Client) {
         assert_eq!(r.promise()["id"], json!(i), "[{}] id round-trips", c.name());
     }
 
-    // Two ':' is refused by the Postgres schema alone.
-    let r = c.promise_create("a:b:c", far, json!({})).await;
-    ex!(c, "id with two ':'", &r, if pg { 500 } else { 200 });
+    // More than one ':' is an id like any other; the origin is the text
+    // before the first one.
+    for i in ["a:b:c", "wft:n1:order-42:r1:3", "x::y", "::"] {
+        let r = c.promise_create(i, far, json!({})).await;
+        ex!(c, &format!("id {i:?}"), &r, 200);
+        assert_eq!(r.promise()["id"], json!(i), "[{}] id round-trips", c.name());
+    }
 
     // Over 255 bytes: MySQL's VARCHAR(255).
     let r = c.promise_create(&noisy(256, 6), far, json!({})).await;
-    ex!(c, "256-byte id", &r, if mysql { 500 } else { 200 });
+    ex!(c, "256-byte id", &r, if mysql { 400 } else { 200 });
+
+    // A target and a listener address past 255 bytes. MySQL/TiDB stores
+    // both in VARCHAR(255) columns and keeps the first 255 bytes without an
+    // error, so the messages go to a truncated address (a known bug, pinned
+    // here; the profile limit of 255 bytes keeps clear of it).
+    let long = format!("poll://any@{}", noisy(300, 10));
+    let want = if mysql { 255 } else { long.len() };
+    let act = id("act.long.1");
+    ex!(
+        c,
+        "311-byte target",
+        &c.promise_create(&act, far, json!({ "resonate:target": long }))
+            .await,
+        200
+    );
+    let first: Vec<usize> = c.routed().iter().map(|r| r.address.len()).collect();
+    assert_eq!(first, vec![long.len()], "[{}] first dispatch", c.name());
+    c.tick(resonate_profile::RETRY_TIMEOUT).await;
+    let again: Vec<usize> = c
+        .routed()
+        .iter()
+        .filter(|r| r.message["data"]["task"]["id"] == json!(act))
+        .map(|r| r.address.len())
+        .collect();
+    assert_eq!(
+        again,
+        vec![want],
+        "[{}] redispatch address length",
+        c.name()
+    );
+    let g = id("glob.long");
+    ex!(
+        c,
+        "global",
+        &c.promise_create(&g, far, json!({ "resonate:scope": "global" }))
+            .await,
+        200
+    );
+    ex!(
+        c,
+        "311-byte listener",
+        &c.register_listener(&g, &long).await,
+        200
+    );
+    ex!(
+        c,
+        "settle",
+        &c.promise_settle(&g, "resolved", None).await,
+        200
+    );
+    let unblock: Vec<usize> = c.routed().iter().map(|r| r.address.len()).collect();
+    assert_eq!(unblock, vec![want], "[{}] unblock address length", c.name());
 
     // The Postgres btree limit: 2704-byte index rows. An incompressible id
     // of 2692 bytes fits; 2693 does not. (A compressible one goes further.)
@@ -1423,3 +1448,62 @@ scenario!(
     timer_with_a_target_is_refused_only_by_postgres,
     timer_with_target
 );
+
+/// Ids with several ':' (design 74 §5.4's shape) through a whole lifecycle:
+/// a workflow task dispatched, claimed, heartbeated, lost, reclaimed and
+/// completed; a timer; and a listener. The origin of each is the text before
+/// its first ':' (`wft`, `tmr`), which matters for where a store keeps them,
+/// never for whether it accepts them.
+async fn several_colons(c: &mut Client) {
+    let wft = "wft:n1.0:order%3A42:r1:3";
+    let tmr = "tmr:n1.0:order%3A42:r1:7";
+    let q = "poll://any@ltq.0.q";
+    let p = c
+        .promise_create(wft, c.now() + 10 * MIN, json!({ "resonate:target": q }))
+        .await;
+    ex!(c, "create", &p, 200);
+    assert_eq!(p.promise()["id"], json!(wft), "[{}]", c.name());
+    expect_routed(c, "dispatch", &c.routed(), &[(q, "execute", wft)]);
+    ex!(
+        c,
+        "acquire",
+        &c.task_acquire(wft, 0, "gw-a", 5_000).await,
+        200
+    );
+    ex!(
+        c,
+        "heartbeat",
+        &c.task_heartbeat("gw-a", &[(wft, 1)]).await,
+        200
+    );
+    c.tick(5_000).await;
+    expect_routed(c, "redelivery", &c.routed(), &[(q, "execute", wft)]);
+    ex!(
+        c,
+        "reacquire",
+        &c.task_acquire(wft, 1, "gw-b", 5_000).await,
+        200
+    );
+    let f = c.task_fulfill(wft, 2, "resolved", None).await;
+    ex!(c, "fulfill", &f, 200);
+    expect_state(c, "fulfill", f.promise(), "resolved");
+
+    let at = c.now() + 1_000;
+    ex!(
+        c,
+        "timer",
+        &c.promise_create(tmr, at, json!({ "resonate:timer": "true" }))
+            .await,
+        200
+    );
+    ex!(c, "listener", &c.register_listener(tmr, GW).await, 200);
+    c.tick(1_000).await;
+    expect_routed(c, "timer fired", &c.routed(), &[(GW, "unblock", tmr)]);
+    // Re-create is idempotent for these ids too.
+    let again = c
+        .promise_create(tmr, at, json!({ "resonate:timer": "true" }))
+        .await;
+    ex!(c, "re-create", &again, 200);
+    expect_state(c, "re-create", again.promise(), "resolved");
+}
+scenario!(ids_with_several_colons_work_on_every_store, several_colons);
