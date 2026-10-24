@@ -17,6 +17,7 @@ members = [
     "crates/resonate-server-mysql",
     "crates/resonate-server-neo4j",
     "crates/resonate-oracle",
+    "crates/resonate-profile",
     "crates/resonate-timer-wheel",
     "crates/resonate-trace",
     "crates/resonate-transport-gcps",
