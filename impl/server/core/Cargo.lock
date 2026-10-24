@@ -2996,6 +2996,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "resonate-client"
+version = "0.10.1"
+dependencies = [
+ "async-trait",
+ "base64",
+ "reqwest 0.12.28",
+ "resonate-auth",
+ "resonate-core",
+ "resonate-gateway-http",
+ "resonate-plugin",
+ "resonate-server-sqlite",
+ "resonate-sql",
+ "serde",
+ "serde_json",
+ "tokio",
+ "validator",
+]
+
+[[package]]
 name = "resonate-core"
 version = "0.10.1"
 dependencies = [
@@ -3015,6 +3034,7 @@ name = "resonate-gateway-http"
 version = "0.10.1"
 dependencies = [
  "async-trait",
+ "base64",
  "lazy_static",
  "resonate-auth",
  "resonate-core",
