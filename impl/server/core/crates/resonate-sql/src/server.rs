@@ -11,6 +11,7 @@ use resonate_core::types::{
 use resonate_core::types::{RequestEnvelope, ResponseEnvelope};
 use resonate_core::util;
 use resonate_core::{ResonateServer, Unavailable};
+use tracing::Instrument;
 
 use crate::deadlines::DeadlineTimer;
 use crate::metrics;
@@ -173,14 +174,29 @@ impl Server {
     /// without a round trip through the sweep.
     pub async fn fire(&self, timeouts: Vec<Timeout>) {
         let now = util::system_time_ms();
-        for timeout in timeouts {
-            let Ok(engine) = self.engine() else {
-                return;
-            };
-            let out = engine.process(Input::Internal(timeout), now).await;
-            self.deliver(out.messages).await;
-            self.arm(out.timeouts);
+        let span = tracing::info_span!("resonate.timer.fire", resonate.timeouts = timeouts.len());
+        async {
+            for timeout in timeouts {
+                let Ok(engine) = self.engine() else {
+                    return;
+                };
+                let one = tracing::info_span!(
+                    "resonate.timer.timeout",
+                    otel.name = %format_args!("timeout {}", timeout.kind()),
+                    resonate.timeout.kind = timeout.kind(),
+                    resonate.timeout.id = %timeout.id(),
+                );
+                async {
+                    let out = engine.process(Input::Internal(timeout), now).await;
+                    self.deliver(out.messages).await;
+                    self.arm(out.timeouts);
+                }
+                .instrument(one)
+                .await;
+            }
         }
+        .instrument(span)
+        .await
     }
 
     /// Deliver what a transition emitted.
@@ -215,9 +231,7 @@ impl Server {
                         address,
                         Message::Execute(ExecuteMsg {
                             kind: "execute".to_string(),
-                            head: MessageHead {
-                                server_url: server_url.clone(),
-                            },
+                            head: MessageHead::new(server_url.clone()),
                             data: ExecuteMsgData {
                                 task: ExecuteMsgTask {
                                     id: task_id,
@@ -236,7 +250,7 @@ impl Server {
                         address,
                         Message::Unblock(UnblockMsg {
                             kind: "unblock".to_string(),
-                            head: UnblockMsgHead {},
+                            head: UnblockMsgHead::default(),
                             data: UnblockMsgData { promise },
                         }),
                     )

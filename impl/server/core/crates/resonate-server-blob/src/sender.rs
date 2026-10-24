@@ -202,9 +202,7 @@ mod tests {
     fn execute(task_id: &str, version: i64) -> Message {
         Message::Execute(ExecuteMsg {
             kind: "execute".to_string(),
-            head: MessageHead {
-                server_url: "http://server:8001".to_string(),
-            },
+            head: MessageHead::new("http://server:8001".to_string()),
             data: ExecuteMsgData {
                 task: ExecuteMsgTask {
                     id: task_id.to_string(),
@@ -217,7 +215,7 @@ mod tests {
     fn unblock(promise_id: &str) -> Message {
         Message::Unblock(UnblockMsg {
             kind: "unblock".to_string(),
-            head: UnblockMsgHead {},
+            head: UnblockMsgHead::default(),
             data: UnblockMsgData {
                 promise: PromiseRecord {
                     id: promise_id.to_string(),
