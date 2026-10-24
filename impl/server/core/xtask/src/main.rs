@@ -175,6 +175,28 @@ fn core() -> PathBuf {
         .to_path_buf()
 }
 
+/// Where cargo puts build output for this workspace: `target/` unless a
+/// `build.target-dir` in a `.cargo/config.toml` above the checkout, or
+/// `CARGO_TARGET_DIR`, says otherwise. `cargo metadata` resolves all three.
+fn target_dir() -> Result<PathBuf> {
+    let out = cargo()
+        .args(["metadata", "--format-version", "1", "--no-deps"])
+        .output()
+        .map_err(|e| format!("cargo metadata: {e}"))?;
+    if !out.status.success() {
+        return Err(format!(
+            "cargo metadata failed: {}",
+            String::from_utf8_lossy(&out.stderr)
+        ));
+    }
+    let meta: serde_json::Value =
+        serde_json::from_slice(&out.stdout).map_err(|e| format!("cargo metadata: {e}"))?;
+    meta["target_directory"]
+        .as_str()
+        .map(PathBuf::from)
+        .ok_or_else(|| "cargo metadata has no target_directory".to_string())
+}
+
 fn cargo() -> Command {
     let mut c = Command::new(std::env::var("CARGO").unwrap_or_else(|_| "cargo".into()));
     c.current_dir(core());
@@ -633,7 +655,7 @@ async fn porcupine(backend: Backend, db: &DbArgs, porc: &PorcArgs) -> Result<()>
     with_fresh_db(backend, db, "porcupine", move |url| {
         let dir = scratch("porcupine")?;
         let port = free_port()?;
-        let mut server = Command::new(core().join("target/release/resonate"));
+        let mut server = Command::new(target_dir()?.join("release/resonate"));
         server
             .arg("serve")
             .current_dir(&dir)
@@ -707,7 +729,7 @@ async fn porcupine(backend: Backend, db: &DbArgs, porc: &PorcArgs) -> Result<()>
         // to be concurrent, fails here rather than linearizing vacuously.
         run(
             "conctrace",
-            Command::new(core().join("target/release/examples/conctrace"))
+            Command::new(target_dir()?.join("release/examples/conctrace"))
                 .current_dir(&dir)
                 .args([
                     "--url",

@@ -1,0 +1,60 @@
+# Carries on `loams/main`
+
+`ostrium-labs/resonate` is Ostrium Labs' fork of
+[resonatehq/resonate](https://github.com/resonatehq/resonate) (Apache-2.0).
+Loams embeds the server from this fork at a pinned revision.
+
+## Branches
+
+- `main` mirrors `resonatehq/resonate` `main`. It only ever fast-forwards and
+  never carries a commit of its own.
+- `loams/main` is the integration branch: `main` plus the carries below. Loams
+  pins a commit of this branch. On an upstream bump it is rebuilt as `main` plus
+  each carry that is still open, in the order of this table.
+- One branch per upstream change (`feat/<topic>`, `fix/<topic>`, `deps/<topic>`),
+  based on `main`, holding one logical change with DCO sign-off. This is the
+  branch an upstream PR is opened from.
+- Fork work items (FW*, from Loams design 74 §7.4) land in `loams/main`
+  through a PR each. An item that is upstreamable gets its own branch on `main`
+  when it is offered upstream.
+- `loam/0.10.1` is the frozen branch that Loams 0.1.x pins (`31ffb201`).
+  Leave it alone until Loams moves its pin to `loams/main`. Its tree is
+  identical to the first `loams/main` (2026-10-24).
+- `loam/tikv-dapr` is an archive of the September TiKV/redb blob stores, the
+  Dapr bridge and the kind deploy scripts. FW1 replaces its TiKV store, and
+  nothing else on it is carried.
+
+## Carries
+
+State is as of 2026-10-24. "Upstream" means a PR on `resonatehq/resonate`.
+
+| Carry | Branch | Upstream | State | Why it is carried |
+|---|---|---|---|---|
+| MySQL: classify retryable errors by error number | `fix/mysql-retryable-errno` | [#1162](https://github.com/resonatehq/resonate/pull/1162) | **Merged** 2026-10-23 (`9c72d818`) | No longer a carry: it is in `main` |
+| RustSec advisories, drop OpenSSL, version internal path deps | `deps/advisories-rustls` | [#1164](https://github.com/resonatehq/resonate/pull/1164) | Open, rebased on `9c72d818` | rustls only, with no OpenSSL in Loams' images. The versioned path deps let Loams depend on the crates by git |
+| `transport-http-push`: GCP ID token behind `gcp-idtoken` | `feat/push-gcp-idtoken-feature` | [#1167](https://github.com/resonatehq/resonate/pull/1167) | Open, rebased | Loams builds without `google-cloud-auth` and reqwest 0.13 |
+| MySQL plugin on TiDB (session pin, errnos, xtask and CI legs) | `feat/tidb-backend` | [#1163](https://github.com/resonatehq/resonate/pull/1163) (draft) | Open, rebased onto the merged #1162 | Loams' legacy durable store on TiDB (FW2) |
+| `sdk-rs`: reqwest without default TLS | `feat/sdk-rs-reqwest-default-feature` | [#1168](https://github.com/resonatehq/resonate/pull/1168) | Open, rebased | Loams embeds the Rust SDK with rustls only |
+| `resonate-auth`: jsonwebtoken 10.3 on aws-lc-rs; unsigned mode without the deprecated switch | `fix/auth-jsonwebtoken-10` | Not opened (needs the owner's approval) | Branch ready on `main` | GHSA-h395-gr6q-cpjc |
+| xtask: resolve the target directory through `cargo metadata` | in FW0 | Not opened | Carried | `porcupine` assumed `<workspace>/target`. It breaks under a configured `build.target-dir` or `CARGO_TARGET_DIR` |
+
+Fork work items (Loams design 74 §7.4) are added to this table as their PRs
+merge into `loams/main`.
+
+## Not upstreamable
+
+None yet. A carry that upstream declines goes here with the reviewer's reason.
+
+## Rebuilding `loams/main` after an upstream bump
+
+```sh
+git fetch upstream
+git push origin upstream/main:main            # fast-forward only
+git switch -C loams/main upstream/main
+# cherry-pick each still-open carry, in table order; resolve; then
+cd impl/server/core && cargo xtask check
+git push --force-with-lease origin loams/main
+```
+
+Loams moves its pin in a PR that changes only `rev` in `Cargo.toml`, plus
+any code the new revision requires.

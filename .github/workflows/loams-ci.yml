@@ -1,0 +1,93 @@
+# The fork's own CI for `loams/main` and the PRs into it (CARRIES.md).
+#
+# The org's runner concurrency is scarce, so this workflow is lean on
+# purpose. The upstream workflows (server-core, server-s3, sdk-rs) are
+# disabled on the fork. What runs here:
+#
+# - `check`: what `cargo xtask check` runs (fmt, check, clippy, tests).
+# - `stores`: porcupine linearizability on each store Loams uses that
+#   needs a service. Each leg starts its database with `docker run` in a step,
+#   so only that leg pays for it, rather than all of them starting in every
+#   leg the way `services:` would.
+#
+# The engine and port differentials on Postgres, MySQL, Neo4j and S3 stay in
+# upstream's server-core workflow. Run them locally with
+# `cargo xtask differential --backend <b>` when a change touches those stores.
+# Contributors are expected to verify locally first. A PR description says
+# what was run.
+
+name: loams
+
+on:
+  pull_request:
+    branches: [loams/main]
+    paths:
+      - "impl/server/core/**"
+      - "spec/valid/porc/**"
+      - ".github/workflows/loams-ci.yml"
+  push:
+    branches: [loams/main]
+    paths:
+      - "impl/server/core/**"
+      - "spec/valid/porc/**"
+      - ".github/workflows/loams-ci.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: loams-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: impl/server/core
+
+jobs:
+  check:
+    name: Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          components: rustfmt, clippy
+          cache-workspaces: impl/server/core
+      - name: Check
+        run: cargo xtask check
+
+  stores:
+    name: Linearizability (${{ matrix.backend }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        backend: [sqlite, tidb]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          cache-workspaces: impl/server/core
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: spec/valid/porc/go.mod
+          cache-dependency-path: spec/valid/porc/go.sum
+
+      # TiDB with its embedded storage (unistore). The SQL layer, the MySQL
+      # protocol and pessimistic transactions are TiDB's own, and those are
+      # what the mysql plugin is held to.
+      - name: Start TiDB
+        if: matrix.backend == 'tidb'
+        run: |
+          docker run -d --name tidb -p 4000:4000 pingcap/tidb:v8.5.8
+          for i in $(seq 1 60); do
+            (echo > /dev/tcp/127.0.0.1/4000) 2>/dev/null && exit 0
+            sleep 2
+          done
+          docker logs tidb; echo "tidb did not open port 4000"; exit 1
+
+      - name: Linearizability
+        env:
+          XTASK_TIDB_ADMIN_URL: mysql://root@127.0.0.1:4000/mysql
+          XTASK_SPEC_DIR: ${{ github.workspace }}/spec/valid/porc
+        run: cargo xtask porcupine --backend ${{ matrix.backend }}
