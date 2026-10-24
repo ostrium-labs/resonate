@@ -383,6 +383,7 @@ async fn the_gateway_answers_what_it_answered_before_byte_for_byte() {
         let state = AppState {
             server: Arc::new(Echo),
             auth: auth.clone(),
+            trace_tags: false,
         };
         let old: Router = legacy_routes().with_state(state.clone());
         let new: Router = api_routes().with_state(state);

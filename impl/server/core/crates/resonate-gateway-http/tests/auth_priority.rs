@@ -45,6 +45,7 @@ async fn seen_by_server(envelope_auth: Option<&str>, header: Option<&str>) -> Op
         // whether it verifies. Turning verification on would reject every
         // token here and hide the difference.
         auth: None,
+        trace_tags: false,
     });
 
     let mut head = json!({ "corrId": "c1", "version": "2026-04-01" });

@@ -27,6 +27,8 @@ use resonate_plugin::prometheus::{
 use resonate_auth::AuthMode;
 use resonate_core::types::{self, RequestEnvelope, ResponseEnvelope};
 use resonate_core::{ui, ResonateServer};
+use resonate_trace::{TraceParent, TRACEPARENT, TRACESTATE};
+use tracing::Instrument;
 
 lazy_static! {
     /// Requests by kind and status. Registered into prometheus' default
@@ -61,6 +63,9 @@ lazy_static! {
 pub struct AppState {
     pub server: Arc<dyn ResonateServer>,
     pub auth: Option<AuthMode>,
+    /// Write a request's `traceparent` header into the tags of a promise it
+    /// creates. See [`Config::trace_tags`](crate::Config::trace_tags).
+    pub trace_tags: bool,
 }
 
 // Sub-state for API handlers — the server, and whether to authenticate.
@@ -68,6 +73,7 @@ pub struct AppState {
 pub struct ApiState {
     pub server: Arc<dyn ResonateServer>,
     pub auth: Option<AuthMode>,
+    pub trace_tags: bool,
 }
 
 impl axum::extract::FromRef<AppState> for ApiState {
@@ -75,6 +81,7 @@ impl axum::extract::FromRef<AppState> for ApiState {
         ApiState {
             server: state.server.clone(),
             auth: state.auth.clone(),
+            trace_tags: state.trace_tags,
         }
     }
 }
@@ -149,7 +156,10 @@ async fn handle_api(
     headers: axum::http::HeaderMap,
     body: axum::body::Bytes,
 ) -> (axum::http::StatusCode, Json<ResponseEnvelope>) {
-    let options = ProtocolOptions::gateway(api_state.auth);
+    let options = ProtocolOptions {
+        trace_tags: api_state.trace_tags,
+        ..ProtocolOptions::gateway(api_state.auth)
+    };
     handle_envelope(api_state.server.as_ref(), &headers, &body, &options).await
 }
 
@@ -178,6 +188,10 @@ pub struct ProtocolOptions {
     /// Verify `head.auth` before the server sees the request. `None` admits
     /// every request — for a host that authenticated it already.
     pub auth: Option<AuthMode>,
+    /// Keep a request's `traceparent` header in the tags of the promise it
+    /// creates, when the client set no `traceparent` tag itself. Off unless
+    /// asked for: a tag the client did not write changes every later read.
+    pub trace_tags: bool,
 }
 
 impl std::fmt::Debug for ProtocolOptions {
@@ -186,6 +200,7 @@ impl std::fmt::Debug for ProtocolOptions {
             .field("forward_authorization", &self.forward_authorization)
             .field("metrics", &self.metrics)
             .field("auth", &self.auth.as_ref().map(|_| ".."))
+            .field("trace_tags", &self.trace_tags)
             .finish()
     }
 }
@@ -198,6 +213,7 @@ impl ProtocolOptions {
             forward_authorization: true,
             metrics: true,
             auth,
+            trace_tags: false,
         }
     }
 
@@ -205,6 +221,39 @@ impl ProtocolOptions {
     /// metrics of this crate's, no Resonate token check.
     pub fn embedded() -> Self {
         Self::default()
+    }
+}
+
+/// The W3C trace context in a request's headers, if it holds a valid one.
+fn trace_context(headers: &axum::http::HeaderMap) -> Option<TraceParent> {
+    let get = |name: &str| headers.get(name).and_then(|v| v.to_str().ok());
+    TraceParent::parse(get(TRACEPARENT)?, get(TRACESTATE))
+}
+
+/// Keep `tp` in the tags of the promise `req` creates, unless the client set a
+/// `traceparent` tag itself. Only for the two kinds that create a promise.
+fn tag_trace(req: &mut RequestEnvelope, tp: &TraceParent) {
+    let data = match req.kind.as_str() {
+        "promise.create" => Some(&mut req.data),
+        "task.create" => req.data.get_mut("action").and_then(|a| a.get_mut("data")),
+        _ => None,
+    };
+    let Some(serde_json::Value::Object(data)) = data else {
+        return;
+    };
+    let tags = data
+        .entry("tags")
+        .or_insert_with(|| serde_json::Value::Object(Default::default()));
+    let Some(tags) = tags.as_object_mut() else {
+        return;
+    };
+    if tags.contains_key(TRACEPARENT) {
+        return;
+    }
+    tags.insert(TRACEPARENT.into(), tp.traceparent().into());
+    if let Some(state) = tp.tracestate() {
+        tags.entry(TRACESTATE)
+            .or_insert_with(|| state.to_string().into());
     }
 }
 
@@ -217,10 +266,57 @@ impl ProtocolOptions {
 ///
 /// `headers` is read only for `Authorization`, and only when
 /// [`ProtocolOptions::forward_authorization`] is set.
+///
+/// The request runs in one span, parented on the caller's trace: the
+/// `traceparent` header when there is one, and otherwise the `traceparent` tag
+/// of the promise the request creates. A worker that received an execute
+/// message carrying a trace sends it back as the header on its `task.*`
+/// requests, which is how create, task and settle end up in one trace.
 pub async fn answer_envelope(
     server: &dyn ResonateServer,
     headers: &axum::http::HeaderMap,
     body: &[u8],
+    options: &ProtocolOptions,
+) -> ResponseEnvelope {
+    let header = trace_context(headers);
+    // Parsed once, here, so the span can be named before the request runs.
+    let parsed = types::parse_and_validate(body);
+    let (kind, corr_id) = match &parsed {
+        Ok(req) => (req.kind.clone(), req.head.corr_id.clone()),
+        Err(_) => types::salvage_context(body),
+    };
+    let span = tracing::info_span!(
+        "resonate.request",
+        otel.name = %kind,
+        otel.kind = "server",
+        rpc.system = "resonate",
+        resonate.kind = %kind,
+        resonate.corr_id = %corr_id,
+        resonate.status = tracing::field::Empty,
+    );
+    let tagged = match (&header, &parsed) {
+        (None, Ok(req)) => resonate_trace::from_request(req),
+        _ => None,
+    };
+    let parent = header.clone().or(tagged);
+    if let Some(tp) = &parent {
+        resonate_trace::set_parent(&span, tp);
+    }
+    let response = resonate_trace::with_incoming(
+        parent,
+        answer(server, headers, header, parsed, (kind, corr_id), options).instrument(span.clone()),
+    )
+    .await;
+    span.record("resonate.status", response.head.status);
+    response
+}
+
+async fn answer(
+    server: &dyn ResonateServer,
+    headers: &axum::http::HeaderMap,
+    trace_header: Option<TraceParent>,
+    parsed: Result<RequestEnvelope, types::Invalid>,
+    salvaged: (String, String),
     options: &ProtocolOptions,
 ) -> ResponseEnvelope {
     let start = std::time::Instant::now();
@@ -230,10 +326,10 @@ pub async fn answer_envelope(
     // rejection reads, and this renders it — which is the only part that is
     // HTTP's. `salvage_context` digs out what it can from bytes that would not
     // parse, so even that answer can be correlated.
-    let mut req: RequestEnvelope = match types::parse_and_validate(body) {
+    let mut req: RequestEnvelope = match parsed {
         Ok(req) => req,
         Err(invalid) => {
-            let (kind, corr_id) = types::salvage_context(body);
+            let (kind, corr_id) = salvaged;
             tracing::warn!(kind = %kind, corr_id = %corr_id, reason = %invalid, "Invalid request");
             return invalid.to_response(kind, corr_id);
         }
@@ -247,6 +343,12 @@ pub async fn answer_envelope(
     if options.forward_authorization && req.head.auth.is_none() {
         if let Some(token) = bearer_token(headers) {
             req.head.auth = Some(token.to_string());
+        }
+    }
+
+    if options.trace_tags {
+        if let Some(tp) = &trace_header {
+            tag_trace(&mut req, tp);
         }
     }
 
