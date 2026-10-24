@@ -8,6 +8,23 @@
 //! `routes` holds that translation. This file holds the socket and the task
 //! that serves it — the part with a lifecycle to coordinate, which is what
 //! [`ResonateGateway`] exists to name.
+//!
+//! # Serving the protocol from another process's router
+//!
+//! The protocol endpoint is public, so a host that runs Resonate servers
+//! inside its own HTTP service — one per tenant, behind its own
+//! authentication — mounts it rather than copying it:
+//!
+//! - [`protocol_router`]: `POST /` with the server resolved per request, to
+//!   `nest` under any path.
+//! - [`handle_envelope`]: one request to an `(status, body)` pair, for a host
+//!   with its own routing.
+//! - [`answer_envelope`]: the envelope alone, for a host whose HTTP is not
+//!   axum.
+//!
+//! [`ProtocolOptions`] chooses what is the host's: whether the
+//! `Authorization` header is a Resonate token to forward, whether this
+//! crate's metrics are recorded, and whether to verify tokens.
 
 pub mod routes;
 
@@ -30,7 +47,7 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::oneshot;
 use tokio::task::JoinHandle;
 
-pub use routes::AppState;
+pub use routes::{answer_envelope, handle_envelope, protocol_router, AppState, ProtocolOptions};
 
 /// This gateway, as a plugin. The worker-facing HTTP edge.
 pub static PLUGIN: resonate_plugin::GatewayPlugin =

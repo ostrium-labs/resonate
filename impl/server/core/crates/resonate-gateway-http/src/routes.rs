@@ -149,7 +149,80 @@ async fn handle_api(
     headers: axum::http::HeaderMap,
     body: axum::body::Bytes,
 ) -> (axum::http::StatusCode, Json<ResponseEnvelope>) {
-    let server = &api_state.server;
+    let options = ProtocolOptions::gateway(api_state.auth);
+    handle_envelope(api_state.server.as_ref(), &headers, &body, &options).await
+}
+
+// === The protocol endpoint, for embedders ===
+
+/// What the protocol endpoint does beyond the protocol.
+///
+/// The endpoint's protocol behaviour is fixed — parse and validate at the
+/// edge, refuse `ui.*`, render `Unavailable` as `503`, answer the server's
+/// envelope with its `head.status` — and these are the parts a host decides.
+/// This gateway runs with [`ProtocolOptions::gateway`]; a process that serves
+/// the endpoint behind authentication of its own wants
+/// [`ProtocolOptions::embedded`].
+#[derive(Clone, Default)]
+pub struct ProtocolOptions {
+    /// Copy a `Bearer` `Authorization` header into a request whose envelope
+    /// left `head.auth` empty.
+    ///
+    /// Right when the header carries a Resonate token. Wrong when it carries
+    /// the host's own credential (an API key, a session), which the host has
+    /// already checked and which is no token a Resonate server should see.
+    pub forward_authorization: bool,
+    /// Count and time requests in `resonate_request_total` and
+    /// `resonate_request_duration_seconds`, in prometheus' default registry.
+    pub metrics: bool,
+    /// Verify `head.auth` before the server sees the request. `None` admits
+    /// every request — for a host that authenticated it already.
+    pub auth: Option<AuthMode>,
+}
+
+impl std::fmt::Debug for ProtocolOptions {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ProtocolOptions")
+            .field("forward_authorization", &self.forward_authorization)
+            .field("metrics", &self.metrics)
+            .field("auth", &self.auth.as_ref().map(|_| ".."))
+            .finish()
+    }
+}
+
+impl ProtocolOptions {
+    /// What this gateway does: forward the header, record metrics, and verify
+    /// with `auth` when there is a policy.
+    pub fn gateway(auth: Option<AuthMode>) -> Self {
+        Self {
+            forward_authorization: true,
+            metrics: true,
+            auth,
+        }
+    }
+
+    /// For a host that authenticates callers itself: nothing forwarded, no
+    /// metrics of this crate's, no Resonate token check.
+    pub fn embedded() -> Self {
+        Self::default()
+    }
+}
+
+/// The envelope the protocol endpoint answers a `POST` of `body` with.
+///
+/// The whole of the endpoint short of HTTP: what this gateway's `POST /`
+/// answers, for the same bytes and the same options, is this envelope with its
+/// `head.status` as the HTTP status ([`handle_envelope`]). For a host whose
+/// HTTP is not axum, or that wants the envelope before it renders it.
+///
+/// `headers` is read only for `Authorization`, and only when
+/// [`ProtocolOptions::forward_authorization`] is set.
+pub async fn answer_envelope(
+    server: &dyn ResonateServer,
+    headers: &axum::http::HeaderMap,
+    body: &[u8],
+    options: &ProtocolOptions,
+) -> ResponseEnvelope {
     let start = std::time::Instant::now();
 
     // Parse and validate at the edge. A body that is not a request never
@@ -157,12 +230,12 @@ async fn handle_api(
     // rejection reads, and this renders it — which is the only part that is
     // HTTP's. `salvage_context` digs out what it can from bytes that would not
     // parse, so even that answer can be correlated.
-    let mut req: RequestEnvelope = match types::parse_and_validate(&body) {
+    let mut req: RequestEnvelope = match types::parse_and_validate(body) {
         Ok(req) => req,
         Err(invalid) => {
-            let (kind, corr_id) = types::salvage_context(&body);
+            let (kind, corr_id) = types::salvage_context(body);
             tracing::warn!(kind = %kind, corr_id = %corr_id, reason = %invalid, "Invalid request");
-            return into_response(invalid.to_response(kind, corr_id));
+            return invalid.to_response(kind, corr_id);
         }
     };
 
@@ -171,8 +244,8 @@ async fn handle_api(
     // when the envelope left it empty — a caller holding a bearer token and
     // nothing else. Nothing downstream can tell the two apart, which is the
     // point: `auth_check` still reads one field.
-    if req.head.auth.is_none() {
-        if let Some(token) = bearer_token(&headers) {
+    if options.forward_authorization && req.head.auth.is_none() {
+        if let Some(token) = bearer_token(headers) {
             req.head.auth = Some(token.to_string());
         }
     }
@@ -190,12 +263,12 @@ async fn handle_api(
     // — this is the boundary, not a missing implementation, so it says so.
     if ui::is_ui_kind(&kind) {
         tracing::warn!(kind = %kind, corr_id = %corr_id, "Console request refused on the worker endpoint");
-        return into_response(ResponseEnvelope::error(
+        return ResponseEnvelope::error(
             kind,
             corr_id,
             404,
             "Console requests ('ui.*') are served on the console's own endpoint, not here",
-        ));
+        );
     }
 
     // Log incoming request at the application protocol level
@@ -205,7 +278,7 @@ async fn handle_api(
         "Received request"
     );
 
-    if let Some(auth) = &api_state.auth {
+    if let Some(auth) = &options.auth {
         if let Err(err_response) = auth.check_envelope(&req).await {
             let status = err_response.head.status.to_string();
             let elapsed_ms = start.elapsed().as_millis();
@@ -216,11 +289,13 @@ async fn handle_api(
                 elapsed_ms = elapsed_ms,
                 "Request rejected by auth"
             );
-            REQUEST_TOTAL.with_label_values(&[&kind, &status]).inc();
-            REQUEST_DURATION
-                .with_label_values(&[&kind])
-                .observe(start.elapsed().as_secs_f64());
-            return into_response(*err_response);
+            if options.metrics {
+                REQUEST_TOTAL.with_label_values(&[&kind, &status]).inc();
+                REQUEST_DURATION
+                    .with_label_values(&[&kind])
+                    .observe(start.elapsed().as_secs_f64());
+            }
+            return *err_response;
         }
     }
 
@@ -261,9 +336,90 @@ async fn handle_api(
         );
     }
 
-    REQUEST_TOTAL.with_label_values(&[&kind, &status]).inc();
-    REQUEST_DURATION
-        .with_label_values(&[&kind])
-        .observe(start.elapsed().as_secs_f64());
-    into_response(response)
+    if options.metrics {
+        REQUEST_TOTAL.with_label_values(&[&kind, &status]).inc();
+        REQUEST_DURATION
+            .with_label_values(&[&kind])
+            .observe(start.elapsed().as_secs_f64());
+    }
+    response
+}
+
+/// The protocol endpoint's HTTP answer to a `POST` of `body`: the envelope
+/// [`answer_envelope`] gives, with its `head.status` as the HTTP status.
+///
+/// This gateway's own `POST /` is this function with
+/// [`ProtocolOptions::gateway`], so an embedder that calls it answers exactly
+/// what the gateway would for the same bytes and options.
+pub async fn handle_envelope(
+    server: &dyn ResonateServer,
+    headers: &axum::http::HeaderMap,
+    body: &[u8],
+    options: &ProtocolOptions,
+) -> (axum::http::StatusCode, Json<ResponseEnvelope>) {
+    into_response(answer_envelope(server, headers, body, options).await)
+}
+
+/// The protocol endpoint as a router, with the server chosen per request.
+///
+/// `POST /` of one envelope, answered by [`handle_envelope`] against whatever
+/// server `resolve` picks from the request's head — by host, by a path
+/// parameter's value an outer layer put in an extension, by the tenant an
+/// authentication middleware attached. Mount it where the host wants it:
+///
+/// ```ignore
+/// let app = axum::Router::new().nest(
+///     "/durable",
+///     protocol_router(
+///         |parts: &Parts| {
+///             let tenant = parts.extensions.get::<Tenant>()?;
+///             servers.get(tenant)
+///         },
+///         ProtocolOptions::embedded(),
+///     ),
+/// );
+/// ```
+///
+/// Nested at `/durable`, the endpoint is `POST /durable` (axum 0.7 does not
+/// also route `/durable/`), and that is the URL a client is given.
+///
+/// `resolve` is synchronous: a lookup that has to wait belongs in a
+/// middleware that leaves its answer in an extension for `resolve` to read.
+/// A request it resolves to nothing is answered `404` with whatever `kind`
+/// and `corrId` could be read from the body, before the body is parsed any
+/// further.
+///
+/// No `/ready` and no legacy paths: those are this gateway's, and a host has
+/// its own probes.
+pub fn protocol_router<F>(resolve: F, options: ProtocolOptions) -> Router
+where
+    F: Fn(&axum::http::request::Parts) -> Option<Arc<dyn ResonateServer>>
+        + Clone
+        + Send
+        + Sync
+        + 'static,
+{
+    let options = Arc::new(options);
+    Router::new().route(
+        "/",
+        post(
+            move |parts: axum::http::request::Parts, body: axum::body::Bytes| {
+                let resolve = resolve.clone();
+                let options = Arc::clone(&options);
+                async move {
+                    let Some(server) = resolve(&parts) else {
+                        let (kind, corr_id) = types::salvage_context(&body);
+                        tracing::warn!(kind = %kind, corr_id = %corr_id, "No server for this request");
+                        return into_response(ResponseEnvelope::error(
+                            kind,
+                            corr_id,
+                            404,
+                            "No Resonate server serves this request",
+                        ));
+                    };
+                    handle_envelope(server.as_ref(), &parts.headers, &body, &options).await
+                }
+            },
+        ),
+    )
 }
