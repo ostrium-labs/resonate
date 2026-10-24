@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<!-- One ClickHouse, one ZooKeeper: SigNoz's single-node layout (deploy/common/clickhouse/cluster.xml at SigNoz a8f6b818, v0.129.0, comments trimmed). -->
+<clickhouse>
+    <zookeeper>
+        <node index="1">
+            <host>zookeeper-1</host>
+            <port>2181</port>
+        </node>
+    </zookeeper>
+    <remote_servers>
+        <cluster>
+            <shard>
+                <replica>
+                    <host>clickhouse</host>
+                    <port>9000</port>
+                </replica>
+            </shard>
+        </cluster>
+    </remote_servers>
+</clickhouse>

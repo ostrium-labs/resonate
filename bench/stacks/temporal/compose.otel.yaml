@@ -1,0 +1,11 @@
+# Temporal server spans to the bench collector. The collector joins this
+# stack's network (a server on two networks advertised the wrong address and
+# its frontend never served), so:
+#   podman compose -f compose.yaml -f compose.data.yaml -f compose.otel.yaml up -d postgres
+#   podman network connect rbench-temporal_default rbench-otelcol
+#   podman compose -f compose.yaml -f compose.data.yaml -f compose.otel.yaml up -d
+services:
+  temporal:
+    environment:
+      OTEL_TRACES_EXPORTER: otlp
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://rbench-otelcol:4317

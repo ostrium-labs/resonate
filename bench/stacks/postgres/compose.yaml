@@ -1,0 +1,22 @@
+# The Postgres for raw Resonate's Postgres leg: the same image and settings as
+# the Temporal stack's Postgres (bench/stacks/temporal), data on $RBENCH_DATA
+# (the same disk as every local leg).
+#
+#   RBENCH_DATA=/mnt/Projects/rbench-data podman compose -p rbench-pg -f bench/stacks/postgres/compose.yaml up -d
+#   podman compose -p rbench-pg -f bench/stacks/postgres/compose.yaml down
+services:
+  postgres:
+    container_name: rbench-pg
+    image: docker.io/library/postgres:17.10@sha256:7958605b474b3d264a969cb3a123d6aa00ad1e1fe9da8a69984dabb704d93317
+    environment:
+      POSTGRES_USER: resonate
+      POSTGRES_PASSWORD: resonate
+      POSTGRES_DB: postgres
+    command: ["postgres", "-c", "max_connections=300", "-c", "synchronous_commit=${RBENCH_PG_SYNCHRONOUS_COMMIT:-on}"]
+    ports: ["127.0.0.1:15432:5432"]
+    volumes: ["${RBENCH_DATA:?set RBENCH_DATA}/pg:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U resonate -d postgres -h 127.0.0.1"]
+      interval: 2s
+      timeout: 3s
+      retries: 60

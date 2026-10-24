@@ -1,0 +1,31 @@
+[package]
+name = "rbench"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+publish = false
+description = "Durable-execution benchmark harness: Goose-driven HTTP workloads, a wrapper for SDK drivers, one metrics format"
+
+# Its own workspace: the bench is not part of the server's build.
+[workspace]
+
+[dependencies]
+# Load generation (Apache-2.0). Exact pin: the results name it.
+goose = "=0.18.1"
+# The same 0.12 line Goose uses, so its client type is ours.
+reqwest = { version = "0.12", default-features = false, features = ["json"] }
+tokio = { version = "1", features = ["full"] }
+futures = "0.3"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+clap = { version = "4", features = ["derive", "env"] }
+anyhow = "1"
+axum = "0.8"
+chrono = { version = "0.4", default-features = false, features = ["std", "clock"] }
+base64 = "0.22"
+opentelemetry = "=0.33.0"
+opentelemetry_sdk = { version = "=0.33.0", features = ["rt-tokio", "trace"] }
+opentelemetry-otlp = { version = "=0.33.0", features = ["grpc-tonic", "trace"] }
+
+[profile.release]
+debug = false

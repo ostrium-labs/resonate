@@ -1,0 +1,121 @@
+# The Temporal leg of rbench: the stock Temporal server 1.32.1 (all four
+# services in one process) on plain Postgres 17.10, pinned as DX0 pins them.
+# See README.md. Host ports are bound to 127.0.0.1 only.
+#
+#   podman compose -f bench/stacks/temporal/compose.yaml up -d --wait
+#   podman compose -f bench/stacks/temporal/compose.yaml down -v
+name: rbench-temporal
+
+x-hardening: &hardening
+  security_opt:
+    - no-new-privileges:true
+
+services:
+  postgres:
+    container_name: rbench-temporal-postgres
+    image: docker.io/library/postgres:17.10@sha256:7958605b474b3d264a969cb3a123d6aa00ad1e1fe9da8a69984dabb704d93317
+    restart: "no"
+    environment:
+      POSTGRES_USER: temporal
+      POSTGRES_PASSWORD: temporal
+      POSTGRES_DB: postgres
+    # Stock settings except the connection cap (four Temporal services with
+    # their pools need more than 100). synchronous_commit stays `on` unless
+    # RBENCH_PG_SYNCHRONOUS_COMMIT says otherwise; it must match the
+    # Resonate Postgres leg for the comparison to be fair (README).
+    command:
+      - postgres
+      - -c
+      - max_connections=300
+      - -c
+      - synchronous_commit=${RBENCH_PG_SYNCHRONOUS_COMMIT:-on}
+    ports:
+      - "127.0.0.1:15433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U temporal -d postgres -h 127.0.0.1"]
+      interval: 2s
+      timeout: 3s
+      retries: 60
+    <<: *hardening
+
+  # One-shot: databases temporal + temporal_visibility and their schema with
+  # the pinned admin-tools' temporal-sql-tool (plugin postgres12).
+  schema:
+    container_name: rbench-temporal-schema
+    image: docker.io/temporalio/admin-tools:1.32.1@sha256:9ef0dc5b063bf4ffd5c1512de72e0e73e225bd2c7006a18ce69bd592a8862a83
+    restart: "no"
+    entrypoint: ["/bin/sh", "/rbench/init.sh", "schema"]
+    environment:
+      PG_HOST: postgres
+      PG_PORT: "5432"
+      PG_USER: temporal
+      PG_PASSWORD: temporal
+    volumes:
+      - ./init.sh:/rbench/init.sh:ro,z
+    depends_on:
+      postgres:
+        condition: service_healthy
+    <<: *hardening
+
+  # frontend, history, matching and worker in one process (TEMPORAL_SERVICES).
+  temporal:
+    container_name: rbench-temporal-server
+    image: docker.io/temporalio/server:1.32.1@sha256:acecbab5b0b8ae9cf4012b508866ca97feda3709577bf157b537239f40029049
+    restart: "no"
+    environment:
+      TEMPORAL_SERVICES: frontend,history,matching,worker
+      DB: postgres12
+      DB_PORT: "5432"
+      POSTGRES_SEEDS: postgres
+      POSTGRES_USER: temporal
+      POSTGRES_PWD: temporal
+      DBNAME: temporal
+      VISIBILITY_DBNAME: temporal_visibility
+      NUM_HISTORY_SHARDS: "16"
+      BIND_ON_IP: 0.0.0.0
+      DYNAMIC_CONFIG_FILE_PATH: /etc/temporal/config/dynamicconfig/development-sql.yaml
+      LOG_LEVEL: ${TEMPORAL_LOG_LEVEL:-warn}
+      # The persistence pool per service; 20 is the image template's default.
+      SQL_MAX_CONNS: ${TEMPORAL_SQL_MAX_CONNS:-20}
+      SQL_MAX_IDLE_CONNS: ${TEMPORAL_SQL_MAX_CONNS:-20}
+      # Server tracing (temporal/fx.go: OTEL_TRACES_EXPORTER, then the OTel
+      # SDK's OTEL_EXPORTER_OTLP_* knobs). Off by default (`none`; an empty
+      # value is rejected): with the exporter on and no collector reachable
+      # the server slowed by an order of magnitude in testing. Turn it on
+      # with TEMPORAL_OTEL_TRACES_EXPORTER=otlp only when a collector is
+      # listening at TEMPORAL_OTEL_ENDPOINT on an address the container can
+      # reach (README).
+      OTEL_TRACES_EXPORTER: ${TEMPORAL_OTEL_TRACES_EXPORTER:-none}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${TEMPORAL_OTEL_ENDPOINT:-http://host.containers.internal:4317}
+      OTEL_EXPORTER_OTLP_TRACES_INSECURE: "true"
+      OTEL_SERVICE_NAME: temporal-server
+    ports:
+      - "127.0.0.1:17233:7233"
+    volumes:
+      - ./dynamicconfig/development-sql.yaml:/etc/temporal/config/dynamicconfig/development-sql.yaml:ro,z
+    depends_on:
+      schema:
+        condition: service_completed_successfully
+    <<: *hardening
+
+  # One-shot: waits for the frontend, then creates namespace `default`
+  # (retention 72h) and waits until it is usable.
+  namespace:
+    container_name: rbench-temporal-namespace
+    image: docker.io/temporalio/admin-tools:1.32.1@sha256:9ef0dc5b063bf4ffd5c1512de72e0e73e225bd2c7006a18ce69bd592a8862a83
+    restart: "no"
+    entrypoint: ["/bin/sh", "/rbench/init.sh", "namespace"]
+    environment:
+      FRONTEND: temporal:7233
+      NAMESPACE: default
+    volumes:
+      - ./init.sh:/rbench/init.sh:ro,z
+    depends_on:
+      temporal:
+        condition: service_started
+    <<: *hardening
+
+volumes:
+  pgdata:

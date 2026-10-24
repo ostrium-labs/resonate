@@ -1,0 +1,2 @@
+[keyspace]
+pre-alloc = ["loams_durable", "resonate_bench"]

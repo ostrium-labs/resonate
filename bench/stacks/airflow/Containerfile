@@ -1,0 +1,7 @@
+# Airflow 3.3.2 (pinned digest, as DX0 pins it) plus the Edge executor provider,
+# installed once at build time instead of on every container start
+# (_PIP_ADDITIONAL_REQUIREMENTS would re-run pip in all six Airflow containers).
+FROM docker.io/apache/airflow:3.3.2-python3.12@sha256:9df9c8be4096b9cc626bd7cb1f2b8c712eef66c59c615f8c7e6200871ca10bd1
+RUN pip install --no-cache-dir \
+      --constraint https://raw.githubusercontent.com/apache/airflow/constraints-3.3.2/constraints-3.12.txt \
+      "apache-airflow==3.3.2" "apache-airflow-providers-edge3==4.3.2"

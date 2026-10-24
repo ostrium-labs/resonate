@@ -1,0 +1,78 @@
+# A one-node PD + TiKV playground for the bench (pinned as the Loams 0.1.1
+# release stack pins them: v8.5.8, API v2 keyspaces), plus, with the profile
+# `loams`, the Loams 0.1.1 engine serving the Resonate protocol at /durable/
+# on a TiKV keyspace: the "TiKV + protocol gateway" leg until the fork's own
+# TiKV store (FW1) is used directly.
+#
+#   RBENCH_DATA=/mnt/Projects/rbench-data podman compose -p rbench-tikv -f bench/stacks/tikv/compose.yaml up -d
+#   ... --profile loams up -d      # adds the engine on 127.0.0.1:18090
+#   podman compose -p rbench-tikv -f bench/stacks/tikv/compose.yaml --profile loams down
+#
+# Host networking, every listener on 127.0.0.1: PD 2379/2380, TiKV 20160/20180,
+# the engine 18090. Data in $RBENCH_DATA/tikv (wiped by the run script, not here).
+x-tikv-tag: &pd-image docker.io/pingcap/pd:v8.5.8@sha256:424e896800e42e1b7eb585b604c8daa3454110d0f0df5ab41f7c5f49164d3aef
+
+services:
+  pd:
+    image: *pd-image
+    container_name: rbench-tikv-pd
+    network_mode: host
+    command:
+      - --name=pd
+      - --data-dir=/data/pd
+      - --config=/etc/pd.toml
+      - --client-urls=http://127.0.0.1:2379
+      - --peer-urls=http://127.0.0.1:2380
+      - --initial-cluster=pd=http://127.0.0.1:2380
+    volumes:
+      - ${RBENCH_DATA:?set RBENCH_DATA}/tikv/pd:/data/pd
+      - ./pd.toml:/etc/pd.toml:ro
+
+  tikv:
+    image: docker.io/pingcap/tikv:v8.5.8@sha256:ab84580b6795868940231aa778a34b082d19e4417e6d66f755c609bebdbbfd69
+    container_name: rbench-tikv-tikv
+    network_mode: host
+    command:
+      - --pd-endpoints=127.0.0.1:2379
+      - --addr=127.0.0.1:20160
+      - --status-addr=127.0.0.1:20180
+      - --data-dir=/data/tikv
+      - --config=/etc/tikv.toml
+    ulimits: { nofile: { soft: 1048576, hard: 1048576 } }
+    volumes:
+      - ${RBENCH_DATA:?set RBENCH_DATA}/tikv/tikv:/data/tikv
+      - ./tikv.toml:/etc/tikv.toml:ro
+    depends_on: [pd]
+
+  loams:
+    profiles: [loams]
+    image: ghcr.io/ostrium-labs/loams:0.1.1@sha256:9fa00b994b1b91aeb2296b9e6be6084b2d90f342866edb7297667d6e64619441
+    container_name: rbench-loams
+    # Root in a rootless container is the invoking user, who owns $RBENCH_DATA.
+    user: "0:0"
+    network_mode: host
+    entrypoint: ["/usr/bin/tini", "--", "loams"]
+    command:
+      - standalone
+      - --bucket=file:///var/lib/loams/bucket
+      - --data-dir=/var/lib/loams
+      - --listen=127.0.0.1:18090
+      - --flight-sql-listen=127.0.0.1:18092
+      - --graph-data-dir=/var/lib/loams/graph
+      - --durable-store=tikv://127.0.0.1:2379/loams_durable
+      # The engine's own loopback durable listener, moved off 8001; the bench
+      # uses the gateway path /durable/ on --listen.
+      - --durable-listen=127.0.0.1:18091
+      # Deliver execute messages to rbench's push listener (127.0.0.1:19190).
+      - --durable-push
+    environment:
+      RUST_LOG: ${RUST_LOG:-warn}
+      # Loopback only, so the engine's own auth is off (LOAMS_AUTH_MODE=off is
+      # refused on a non-loopback listener).
+      LOAMS_AUTH_MODE: "off"
+      LOAMS_HOUSE_ENDPOINT: ""
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://127.0.0.1:4317}
+      OTEL_SERVICE_NAME: loams-engine
+    volumes:
+      - ${RBENCH_DATA:?set RBENCH_DATA}/loams:/var/lib/loams
+    depends_on: [tikv]

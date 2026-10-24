@@ -1,0 +1,141 @@
+# The bench's trace viewer: SigNoz community (MIT) on its own bundled
+# ClickHouse, plus an OpenTelemetry Collector (contrib, Apache-2.0) in front
+# that writes every span to files AND forwards it to SigNoz.
+#
+# Why not Loams House: the Factory overlay (loams deploy/factory/signoz) points
+# SigNoz at Loams House, but on 2026-10-24 the House changes SigNoz needs
+# (ostrium-labs/loams#1176, #1181) were still open, and the overlay itself says
+# it is "the configuration contract, not a working default" until
+# signoz_on_house_smoke passes. So this is SigNoz's own single-node layout
+# (SigNoz deploy/docker at a8f6b818, v0.129.0, the last commit with it; ClickHouse
+# 25.12.5 as SigNoz Foundry pins it, since collector v0.144 needs it),
+# images pinned by digest, with the community image instead of `signoz/signoz`.
+#
+#   podman compose -p rbench-signoz -f bench/stacks/signoz/compose.yaml up -d
+#   UI: http://127.0.0.1:13301   OTLP in: 127.0.0.1:4317 (gRPC), :4318 (HTTP)
+#   down: podman compose -p rbench-signoz -f bench/stacks/signoz/compose.yaml down
+#
+# Every host port binds 127.0.0.1. Trace files land in ./traces (gitignored;
+# results copy compressed exports).
+
+x-ch-image: &ch-image docker.io/clickhouse/clickhouse-server:25.12.5@sha256:cacf32d6884291dc2ff5e0156a97f46fc53ff7c929a7906d114e268a929dfd3a
+x-collector-image: &collector-image docker.io/signoz/signoz-otel-collector:v0.144.12@sha256:deb566a7a3c0ba544ee58ccc92ee1f0e6da827bc40383e52f3c824705e100a3d
+x-collector-env: &collector-env
+  SIGNOZ_OTEL_COLLECTOR_CLICKHOUSE_DSN: tcp://clickhouse:9000
+  SIGNOZ_OTEL_COLLECTOR_CLICKHOUSE_CLUSTER: cluster
+  SIGNOZ_OTEL_COLLECTOR_CLICKHOUSE_REPLICATION: "true"
+  SIGNOZ_OTEL_COLLECTOR_TIMEOUT: 10m
+  LOW_CARDINAL_EXCEPTION_GROUPING: "false"
+
+services:
+  init-clickhouse:
+    image: *ch-image
+    container_name: rbench-signoz-init-clickhouse
+    restart: on-failure
+    # SigNoz's histogramQuantile UDF, from SigNoz's release (v0.0.1).
+    command:
+      - bash
+      - -c
+      - |
+        test -x /var/lib/clickhouse/user_scripts/histogramQuantile && exit 0
+        cd /tmp && wget -q -O hq.tgz "https://github.com/SigNoz/signoz/releases/download/histogram-quantile%2Fv0.0.1/histogram-quantile_linux_amd64.tar.gz" &&
+        tar -xzf hq.tgz && mv histogram-quantile /var/lib/clickhouse/user_scripts/histogramQuantile
+    volumes: [user-scripts:/var/lib/clickhouse/user_scripts/]
+
+  zookeeper-1:
+    image: docker.io/signoz/zookeeper:3.7.1@sha256:fcc4a3288154ccaa3bdb5ae6dc10180c084d29a8a6a26b62ac8e30a8940dc2e6
+    container_name: rbench-signoz-zookeeper
+    user: root
+    restart: unless-stopped
+    environment:
+      ZOO_SERVER_ID: "1"
+      ALLOW_ANONYMOUS_LOGIN: "yes"
+      ZOO_AUTOPURGE_INTERVAL: "1"
+    volumes: [zookeeper:/bitnami/zookeeper]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s -m 2 http://localhost:8080/commands/ruok | grep error | grep null"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  clickhouse:
+    image: *ch-image
+    container_name: rbench-signoz-clickhouse
+    restart: unless-stopped
+    environment: { CLICKHOUSE_SKIP_USER_SETUP: "1" }
+    ulimits: { nofile: { soft: 262144, hard: 262144 } }
+    mem_limit: 3g
+    depends_on:
+      init-clickhouse: { condition: service_completed_successfully }
+      zookeeper-1: { condition: service_healthy }
+    volumes:
+      - ./clickhouse/config.xml:/etc/clickhouse-server/config.xml:ro
+      - ./clickhouse/users.xml:/etc/clickhouse-server/users.xml:ro
+      - ./clickhouse/custom-function.xml:/etc/clickhouse-server/custom-function.xml:ro
+      - ./clickhouse/cluster.xml:/etc/clickhouse-server/config.d/cluster.xml:ro
+      - user-scripts:/var/lib/clickhouse/user_scripts/
+      - clickhouse:/var/lib/clickhouse/
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "0.0.0.0:8123/ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  migrator:
+    image: *collector-image
+    container_name: rbench-signoz-migrator
+    restart: on-failure
+    environment: *collector-env
+    entrypoint: ["/bin/sh", "-c"]
+    command: ["/signoz-otel-collector migrate bootstrap && /signoz-otel-collector migrate sync up && /signoz-otel-collector migrate async up"]
+    depends_on:
+      clickhouse: { condition: service_healthy }
+
+  signoz:
+    image: docker.io/signoz/signoz-community:v0.145.0@sha256:5f9b59276590a5e0e0eb2a7f99e88c9b27f44e4575d18c555aaa07648bca9d0c
+    container_name: rbench-signoz
+    restart: unless-stopped
+    environment:
+      SIGNOZ_TELEMETRYSTORE_CLICKHOUSE_DSN: tcp://clickhouse:9000
+      SIGNOZ_TELEMETRYSTORE_CLICKHOUSE_CLUSTER: cluster
+      SIGNOZ_SQLSTORE_PROVIDER: sqlite
+      SIGNOZ_SQLSTORE_SQLITE_PATH: /var/lib/signoz/signoz.db
+      SIGNOZ_TOKENIZER_JWT_SECRET: rbench-local-only
+      SIGNOZ_ANALYTICS_ENABLED: "false"
+      SIGNOZ_STATSREPORTER_ENABLED: "false"
+    ports: ["127.0.0.1:13301:8080"]
+    volumes: [signoz:/var/lib/signoz]
+    depends_on:
+      migrator: { condition: service_completed_successfully }
+
+  signoz-otel-collector:
+    image: *collector-image
+    container_name: rbench-signoz-otel-collector
+    restart: unless-stopped
+    environment: *collector-env
+    entrypoint: ["/bin/sh", "-c"]
+    command: ["/signoz-otel-collector migrate sync check && /signoz-otel-collector --config=/etc/otel-collector-config.yaml"]
+    volumes: [./signoz-collector.yaml:/etc/otel-collector-config.yaml:ro]
+    depends_on:
+      migrator: { condition: service_completed_successfully }
+
+  # The bench's own front door: OTLP in on the host, spans to files and to SigNoz.
+  otelcol:
+    image: docker.io/otel/opentelemetry-collector-contrib:0.162.0@sha256:39923a8e431bd1f57be82411999d389fcfe40857492e4365456d97a4c1f74be6
+    container_name: rbench-otelcol
+    restart: unless-stopped
+    user: "0:0"
+    command: ["--config=/etc/otelcol/config.yaml"]
+    volumes:
+      - ./otelcol.yaml:/etc/otelcol/config.yaml:ro
+      - ./traces:/traces
+    ports:
+      - 127.0.0.1:4317:4317
+      - 127.0.0.1:${RBENCH_OTLP_HTTP_PORT:-4318}:4318
+    depends_on: [signoz-otel-collector]
+
+volumes:
+  user-scripts:
+  zookeeper:
+  clickhouse:
+  signoz:

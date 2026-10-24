@@ -1,0 +1,7 @@
+# The Temporal server's dynamic config for the rbench stack. As DX0's
+# deploy/release/compute/temporal/development-sql.yaml in ostrium-labs/loams
+# (itself upstream's config/dynamicconfig/development-sql.yaml at v1.32.1):
+# the server's own defaults apply to everything not listed.
+limit.maxIDLength:
+  - value: 255
+    constraints: {}
