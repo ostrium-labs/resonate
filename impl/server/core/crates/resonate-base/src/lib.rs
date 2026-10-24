@@ -240,7 +240,7 @@ struct Exporter;
 
 #[cfg(not(feature = "otlp"))]
 impl Exporter {
-    fn layer<S>(&self) -> tracing_subscriber::layer::Identity {
+    fn layer(&self) -> tracing_subscriber::layer::Identity {
         tracing_subscriber::layer::Identity::new()
     }
 
