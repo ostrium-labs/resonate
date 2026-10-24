@@ -7,6 +7,7 @@ description = "Resonate transport: deliver messages to a worker over HTTP(S), wi
 
 [dependencies]
 resonate-plugin = { version = "0.10.1", path = "../resonate-plugin" }
+resonate-trace = { version = "0.10.1", path = "../resonate-trace" }
 async-trait = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

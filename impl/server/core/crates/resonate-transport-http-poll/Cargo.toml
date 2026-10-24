@@ -7,6 +7,7 @@ description = "Resonate transport: deliver messages to a worker that holds an op
 
 [dependencies]
 resonate-plugin = { version = "0.10.1", path = "../resonate-plugin" }
+resonate-trace = { version = "0.10.1", path = "../resonate-trace" }
 resonate-auth = { version = "0.10.1", path = "../resonate-auth" }
 async-stream = "0.3"
 async-trait = { workspace = true }
