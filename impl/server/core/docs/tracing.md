@@ -120,6 +120,9 @@ to get a durable `traceparent` tag can opt in on the HTTP gateway:
 trace_tags = true   # default false
 ```
 
+An embedder serving the endpoint through `protocol_router` sets the same
+switch as `ProtocolOptions::trace_tags`.
+
 With this on, a `promise.create` or `task.create` that has a `traceparent`
 header but no `traceparent` tag gets the header written into its tags.
 
@@ -135,7 +138,7 @@ name, which a log line shows, is in brackets.
 
 | Span | Where | Attributes |
 |---|---|---|
-| `<kind>`, e.g. `promise.create` [`resonate.request`] | HTTP gateway, one per request; kind `server`; parented on the incoming `traceparent` | `rpc.system=resonate`, `resonate.kind`, `resonate.corr_id`, `resonate.status` |
+| `<kind>`, e.g. `promise.create` [`resonate.request`] | HTTP gateway, one per request (also for an embedder serving `protocol_router` or calling `answer_envelope`); kind `server`; parented on the incoming `traceparent` | `rpc.system=resonate`, `resonate.kind`, `resonate.corr_id`, `resonate.status` |
 | `process <kind>` [`resonate.process`] | the server port, whatever is in front of it | `resonate.kind`, `resonate.corr_id`, `resonate.status` |
 | `<store>.<op>` [`resonate.store`] | one per storage operation | `db.system`, `db.operation`, `outcome` (`ok`/`error`) |
 | `resonate.blob.batch` | blob: one origin's decision batch; parented on its first request and linked to the rest | `resonate.origin`, `resonate.batch_size`, `resonate.attempts`; a `CAS retry` event per lost compare-and-swap, with `attempt` and `outcome` |
