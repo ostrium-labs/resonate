@@ -25,3 +25,5 @@ tracing = "0.1"
 # The auth-priority test drives the API route the way a caller does.
 tower = { version = "0.5", features = ["util"] }
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+# Unsigned test tokens for the protocol-entry comparison.
+base64 = "0.22"

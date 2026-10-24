@@ -3,6 +3,7 @@ members = [
     "crates/resonate-auth",
     "crates/resonate-base",
     "crates/resonate-cli",
+    "crates/resonate-client",
     "crates/resonate-core",
     "crates/resonate-gateway-http",
     "crates/resonate-gateway-metrics",
