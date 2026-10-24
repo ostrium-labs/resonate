@@ -64,6 +64,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use tokio::sync::{mpsc, oneshot, Mutex as AsyncMutex};
+use tracing::Instrument;
 
 use crate::kernel::state::{apply_effects, Effect, KernelCfg, OriginDoc, Reply, Req};
 use crate::kernel::{drain, handle};
@@ -286,10 +287,15 @@ enum Work {
         req: Box<Req>,
         now: i64,
         reply: oneshot::Sender<Result<Reply, Unavailable>>,
+        /// The span of whoever submitted it, which the batch that decides it
+        /// is parented on: the actor is another task, so nothing carries the
+        /// caller's span across the mailbox otherwise.
+        span: tracing::Span,
     },
     Tick {
         now: i64,
         done: oneshot::Sender<Result<(), Unavailable>>,
+        span: tracing::Span,
     },
 }
 
@@ -297,6 +303,12 @@ impl Work {
     fn now(&self) -> i64 {
         match self {
             Work::Request { now, .. } | Work::Tick { now, .. } => *now,
+        }
+    }
+
+    fn span(&self) -> &tracing::Span {
+        match self {
+            Work::Request { span, .. } | Work::Tick { span, .. } => span,
         }
     }
 
@@ -383,6 +395,7 @@ impl OriginActors {
                 req: Box::new(req),
                 now,
                 reply: tx,
+                span: tracing::Span::current(),
             },
         )
         .await?;
@@ -393,7 +406,15 @@ impl OriginActors {
     /// Sweep one origin's deadlines.
     pub async fn tick(&self, origin: &str, now: i64) -> Result<(), Unavailable> {
         let (tx, rx) = oneshot::channel();
-        self.send(origin, Work::Tick { now, done: tx }).await?;
+        self.send(
+            origin,
+            Work::Tick {
+                now,
+                done: tx,
+                span: tracing::Span::current(),
+            },
+        )
+        .await?;
         rx.await
             .map_err(|_| Unavailable::new("origin worker stopped before answering"))?
     }
@@ -491,15 +512,44 @@ struct Decision {
     sends: Vec<Effect>,
 }
 
+/// One batch, in one span: parented on the first request in it, and linked
+/// to the rest, so a request's trace shows the store work done for it however
+/// it was batched.
 async fn run_batch(origin: &str, batch: Vec<Work>, shared: &Arc<Shared>) {
+    let span = match batch.first() {
+        Some(first) => tracing::info_span!(
+            parent: first.span(),
+            "resonate.blob.batch",
+            resonate.origin = %origin,
+            resonate.batch_size = batch.len(),
+            resonate.attempts = tracing::field::Empty,
+        ),
+        None => return,
+    };
+    for work in &batch[1..] {
+        span.follows_from(work.span());
+    }
+    run_batch_attempts(origin, batch, shared)
+        .instrument(span)
+        .await
+}
+
+async fn run_batch_attempts(origin: &str, batch: Vec<Work>, shared: &Arc<Shared>) {
     let mut attempt = 0u32;
     loop {
+        tracing::Span::current().record("resonate.attempts", attempt + 1);
         let loaded = match load(origin, shared).await {
             Ok(l) => l,
             Err(e) => return fail_all(batch, &e),
         };
         let decision = decide(&loaded.doc, &batch, shared);
-        match perform(origin, &loaded, &decision, shared).await {
+        let performed = perform(origin, &loaded, &decision, shared).await;
+        if let Err(e @ (StoreError::PreconditionFailed | StoreError::Conflict)) = &performed {
+            // A lost race is the CAS working: it is an event on the batch,
+            // with the attempt it cost, not an error.
+            tracing::info!(attempt = attempt + 1, outcome = %e, "CAS retry");
+        }
+        match performed {
             Ok(()) => {
                 for effect in &decision.sends {
                     if let Effect::Send { address, msg } = effect {

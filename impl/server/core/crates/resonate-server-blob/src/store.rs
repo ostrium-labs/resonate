@@ -121,6 +121,12 @@ pub trait Store: Send + Sync {
             }
         }
     }
+
+    /// What kind of store this is, as spans and metrics name it: `blob` for
+    /// an object store. An implementation over something else says so.
+    fn system(&self) -> &'static str {
+        "blob"
+    }
 }
 
 // ---------------------------------------------------------------------------

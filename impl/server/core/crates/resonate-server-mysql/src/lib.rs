@@ -135,93 +135,96 @@ impl MysqlEngine {
         F: FnMut(&MysqlDb) -> StorageResult<T> + Send + 'static,
         T: Send + 'static,
     {
-        // On deadlock (1213) or lock wait timeout (1205), retry once immediately.
-        // If the retry also fails, return Serialization error (maps to 503).
-        let max_retries: u32 = 1;
+        resonate_sql::store_op("mysql", "transact", |r| r.is_ok(), async move {
+            // On deadlock (1213) or lock wait timeout (1205), retry once immediately.
+            // If the retry also fails, return Serialization error (maps to 503).
+            let max_retries: u32 = 1;
 
-        let mut f = f;
-        for attempt in 0..=max_retries {
-            #[cfg(feature = "concurrency-stress")]
-            tokio::task::yield_now().await;
-
-            let tx = self.pool.begin().await.map_err(StorageError::from)?;
-
-            let task_retry_timeout = self.task_retry_timeout;
-            let preload_limit = self.preload_limit;
-            let (result, emitted, armed, tx) = tokio::task::block_in_place(|| {
-                let db = MysqlDb {
-                    tx: UnsafeCell::new(tx),
-                    task_retry_timeout,
-                    preload_limit,
-                    emitted: RefCell::new(Vec::new()),
-                    armed: RefCell::new(Vec::new()),
-                };
-
+            let mut f = f;
+            for attempt in 0..=max_retries {
                 #[cfg(feature = "concurrency-stress")]
-                {
-                    let nanos = std::time::SystemTime::now()
-                        .duration_since(std::time::UNIX_EPOCH)
-                        .unwrap_or_default()
-                        .subsec_nanos();
-                    std::thread::sleep(std::time::Duration::from_micros((nanos % 1000) as u64 + 1));
-                }
+                tokio::task::yield_now().await;
 
-                let result = f(&db);
-                let emitted = db.emitted.into_inner();
-                let armed = db.armed.into_inner();
-                let tx = db.tx.into_inner();
-                (result, emitted, armed, tx)
-            });
+                let tx = self.pool.begin().await.map_err(StorageError::from)?;
 
-            // If business logic failed with a serialization error, retry.
-            // Other errors propagate immediately (tx is dropped → auto-rollback).
-            let result = match result {
-                Ok(v) => v,
-                Err(StorageError::Serialization) => {
-                    if attempt < max_retries {
-                        tracing::warn!(
-                            attempt = attempt + 1,
-                            "Serialization failure (1213/1205) in query, retrying"
-                        );
-                        continue;
-                    } else {
-                        tracing::warn!(
-                            "Serialization failure (1213/1205) in query after retry, returning 503"
-                        );
-                        return Err(StorageError::Serialization);
+                let task_retry_timeout = self.task_retry_timeout;
+                let preload_limit = self.preload_limit;
+                let (result, emitted, armed, tx) = tokio::task::block_in_place(|| {
+                    let db = MysqlDb {
+                        tx: UnsafeCell::new(tx),
+                        task_retry_timeout,
+                        preload_limit,
+                        emitted: RefCell::new(Vec::new()),
+                        armed: RefCell::new(Vec::new()),
+                    };
+
+                    #[cfg(feature = "concurrency-stress")]
+                    {
+                        let nanos = std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .unwrap_or_default()
+                            .subsec_nanos();
+                        std::thread::sleep(std::time::Duration::from_micros((nanos % 1000) as u64 + 1));
                     }
-                }
-                Err(e) => return Err(e),
-            };
 
-            match tokio::task::block_in_place(|| {
-                tokio::runtime::Handle::current().block_on(tx.commit())
-            }) {
-                Ok(_) => return Ok((result, emitted, armed)),
-                Err(e) => {
-                    // By server error number: `code()` is the SQLSTATE, so
-                    // comparing it with "1213"/"1205" never matched, and a
-                    // deadlock or lock wait timeout at commit answered 500.
-                    if resonate_sql::is_retryable(&e) {
+                    let result = f(&db);
+                    let emitted = db.emitted.into_inner();
+                    let armed = db.armed.into_inner();
+                    let tx = db.tx.into_inner();
+                    (result, emitted, armed, tx)
+                });
+
+                // If business logic failed with a serialization error, retry.
+                // Other errors propagate immediately (tx is dropped → auto-rollback).
+                let result = match result {
+                    Ok(v) => v,
+                    Err(StorageError::Serialization) => {
                         if attempt < max_retries {
                             tracing::warn!(
                                 attempt = attempt + 1,
-                                "Serialization failure (1213/1205) at commit, retrying"
+                                "Serialization failure (1213/1205) in query, retrying"
                             );
                             continue;
                         } else {
                             tracing::warn!(
-                                "Serialization failure (1213/1205) at commit after retry, returning 503"
+                                "Serialization failure (1213/1205) in query after retry, returning 503"
                             );
                             return Err(StorageError::Serialization);
                         }
                     }
-                    return Err(StorageError::from(e));
+                    Err(e) => return Err(e),
+                };
+
+                match tokio::task::block_in_place(|| {
+                    tokio::runtime::Handle::current().block_on(tx.commit())
+                }) {
+                    Ok(_) => return Ok((result, emitted, armed)),
+                    Err(e) => {
+                        // By server error number: `code()` is the SQLSTATE, so
+                        // comparing it with "1213"/"1205" never matched, and a
+                        // deadlock or lock wait timeout at commit answered 500.
+                        if resonate_sql::is_retryable(&e) {
+                            if attempt < max_retries {
+                                tracing::warn!(
+                                    attempt = attempt + 1,
+                                    "Serialization failure (1213/1205) at commit, retrying"
+                                );
+                                continue;
+                            } else {
+                                tracing::warn!(
+                                    "Serialization failure (1213/1205) at commit after retry, returning 503"
+                                );
+                                return Err(StorageError::Serialization);
+                            }
+                        }
+                        return Err(StorageError::from(e));
+                    }
                 }
             }
-        }
 
-        unreachable!("transact loop completed without returning")
+            unreachable!("transact loop completed without returning")
+        })
+        .await
     }
 
     /// One operation: run it, and turn a storage failure into a response.

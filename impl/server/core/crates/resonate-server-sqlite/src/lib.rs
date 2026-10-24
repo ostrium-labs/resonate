@@ -131,31 +131,34 @@ impl SqliteEngine {
         F: FnMut(&SqliteDb) -> StorageResult<T> + Send + 'static,
         T: Send + 'static,
     {
-        #[cfg(feature = "concurrency-stress")]
-        tokio::task::yield_now().await;
+        resonate_sql::store_op("sqlite", "transact", |r| r.is_ok(), async move {
+            #[cfg(feature = "concurrency-stress")]
+            tokio::task::yield_now().await;
 
-        let mut f = f;
-        let conn = Arc::clone(&self.conn);
-        let task_retry_timeout = self.task_retry_timeout;
-        let preload_limit = self.preload_limit;
-        tokio::task::block_in_place(|| {
-            // Use unwrap_or_else to recover from poisoned mutex (a prior panic
-            // while holding the lock). The connection itself is still valid.
-            let conn = conn.lock().unwrap_or_else(|e| e.into_inner());
-            let tx = conn.unchecked_transaction()?;
-            let db = SqliteDb {
-                conn: &tx,
-                task_retry_timeout,
-                preload_limit,
-                emitted: RefCell::new(Vec::new()),
-                armed: RefCell::new(Vec::new()),
-            };
-            let result = f(&db)?;
-            let emitted = db.emitted.into_inner();
-            let armed = db.armed.into_inner();
-            tx.commit()?;
-            Ok((result, emitted, armed))
+            let mut f = f;
+            let conn = Arc::clone(&self.conn);
+            let task_retry_timeout = self.task_retry_timeout;
+            let preload_limit = self.preload_limit;
+            tokio::task::block_in_place(|| {
+                // Use unwrap_or_else to recover from poisoned mutex (a prior panic
+                // while holding the lock). The connection itself is still valid.
+                let conn = conn.lock().unwrap_or_else(|e| e.into_inner());
+                let tx = conn.unchecked_transaction()?;
+                let db = SqliteDb {
+                    conn: &tx,
+                    task_retry_timeout,
+                    preload_limit,
+                    emitted: RefCell::new(Vec::new()),
+                    armed: RefCell::new(Vec::new()),
+                };
+                let result = f(&db)?;
+                let emitted = db.emitted.into_inner();
+                let armed = db.armed.into_inner();
+                tx.commit()?;
+                Ok((result, emitted, armed))
+            })
         })
+        .await
     }
 
     /// One operation: run it, and turn a storage failure into a response.
@@ -194,24 +197,27 @@ impl SqliteEngine {
         F: FnMut(&SqliteDb) -> StorageResult<T> + Send + 'static,
         T: Send + 'static,
     {
-        #[cfg(feature = "concurrency-stress")]
-        tokio::task::yield_now().await;
+        resonate_sql::store_op("sqlite", "query", |r| r.is_ok(), async move {
+            #[cfg(feature = "concurrency-stress")]
+            tokio::task::yield_now().await;
 
-        let mut f = f;
-        let conn = Arc::clone(&self.conn);
-        let task_retry_timeout = self.task_retry_timeout;
-        let preload_limit = self.preload_limit;
-        tokio::task::block_in_place(|| {
-            let conn = conn.lock().unwrap_or_else(|e| e.into_inner());
-            let db = SqliteDb {
-                conn: &conn,
-                task_retry_timeout,
-                preload_limit,
-                emitted: RefCell::new(Vec::new()),
-                armed: RefCell::new(Vec::new()),
-            };
-            f(&db)
+            let mut f = f;
+            let conn = Arc::clone(&self.conn);
+            let task_retry_timeout = self.task_retry_timeout;
+            let preload_limit = self.preload_limit;
+            tokio::task::block_in_place(|| {
+                let conn = conn.lock().unwrap_or_else(|e| e.into_inner());
+                let db = SqliteDb {
+                    conn: &conn,
+                    task_retry_timeout,
+                    preload_limit,
+                    emitted: RefCell::new(Vec::new()),
+                    armed: RefCell::new(Vec::new()),
+                };
+                f(&db)
+            })
         })
+        .await
     }
 
     pub async fn dispatch(&self, req: &RequestEnvelope, now: i64) -> Output {

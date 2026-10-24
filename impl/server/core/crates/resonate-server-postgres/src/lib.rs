@@ -192,88 +192,94 @@ impl PostgresEngine {
         F: FnMut(&PostgresDb) -> StorageResult<T> + Send + 'static,
         T: Send + 'static,
     {
-        // One retry, unconditionally, as MySQL does. A serialization failure
-        // means the transaction aborted with nothing committed — the emissions
-        // above are dropped with it — so re-running the closure from scratch
-        // is safe, and `promise_create` raises this error itself precisely to
-        // ask for that. It used to be gated on a `serializable` flag that
-        // every one of the seven call sites passed `false`, so the retry never
-        // ran and the request the code asked to retry became a 503 instead.
-        const MAX_RETRIES: u32 = 1;
+        resonate_sql::store_op("postgres", "transact", |r| r.is_ok(), async move {
+            // One retry, unconditionally, as MySQL does. A serialization failure
+            // means the transaction aborted with nothing committed — the emissions
+            // above are dropped with it — so re-running the closure from scratch
+            // is safe, and `promise_create` raises this error itself precisely to
+            // ask for that. It used to be gated on a `serializable` flag that
+            // every one of the seven call sites passed `false`, so the retry never
+            // ran and the request the code asked to retry became a 503 instead.
+            const MAX_RETRIES: u32 = 1;
 
-        let mut f = f;
-        for attempt in 0..=MAX_RETRIES {
-            #[cfg(feature = "concurrency-stress")]
-            tokio::task::yield_now().await;
-
-            // READ COMMITTED, the connection default, and what the
-            // single-round-trip CTEs are written against: they take their own
-            // row locks with `FOR UPDATE` rather than relying on the isolation
-            // level to serialize them.
-            let tx = self.pool.begin().await.map_err(StorageError::from)?;
-
-            let task_retry_timeout = self.task_retry_timeout;
-            let preload_limit = self.preload_limit;
-            let (result, emitted, armed, tx) = tokio::task::block_in_place(|| {
-                let db = PostgresDb {
-                    tx: UnsafeCell::new(tx),
-                    task_retry_timeout,
-                    preload_limit,
-                    emitted: RefCell::new(Vec::new()),
-                    armed: RefCell::new(Vec::new()),
-                };
-
+            let mut f = f;
+            for attempt in 0..=MAX_RETRIES {
                 #[cfg(feature = "concurrency-stress")]
-                {
-                    let nanos = std::time::SystemTime::now()
-                        .duration_since(std::time::UNIX_EPOCH)
-                        .unwrap_or_default()
-                        .subsec_nanos();
-                    std::thread::sleep(std::time::Duration::from_micros((nanos % 1000) as u64 + 1));
-                }
+                tokio::task::yield_now().await;
 
-                let result = f(&db);
-                let emitted = db.emitted.into_inner();
-                let armed = db.armed.into_inner();
-                let tx = db.tx.into_inner();
-                (result, emitted, armed, tx)
-            });
+                // READ COMMITTED, the connection default, and what the
+                // single-round-trip CTEs are written against: they take their own
+                // row locks with `FOR UPDATE` rather than relying on the isolation
+                // level to serialize them.
+                let tx = self.pool.begin().await.map_err(StorageError::from)?;
 
-            let result = match result {
-                Ok(v) => v,
-                Err(StorageError::Serialization) => {
-                    if attempt < MAX_RETRIES {
-                        tracing::warn!(
-                            attempt = attempt + 1,
-                            "Serialization failure (40001) in query, retrying"
-                        );
-                        continue;
+                let task_retry_timeout = self.task_retry_timeout;
+                let preload_limit = self.preload_limit;
+                let (result, emitted, armed, tx) = tokio::task::block_in_place(|| {
+                    let db = PostgresDb {
+                        tx: UnsafeCell::new(tx),
+                        task_retry_timeout,
+                        preload_limit,
+                        emitted: RefCell::new(Vec::new()),
+                        armed: RefCell::new(Vec::new()),
+                    };
+
+                    #[cfg(feature = "concurrency-stress")]
+                    {
+                        let nanos = std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .unwrap_or_default()
+                            .subsec_nanos();
+                        std::thread::sleep(std::time::Duration::from_micros(
+                            (nanos % 1000) as u64 + 1,
+                        ));
                     }
-                    return Err(StorageError::Serialization);
-                }
-                Err(e) => return Err(e),
-            };
 
-            match tokio::task::block_in_place(|| {
-                tokio::runtime::Handle::current().block_on(tx.commit())
-            }) {
-                Ok(_) => return Ok((result, emitted, armed)),
-                Err(e) => {
-                    let pg_err = e
-                        .as_database_error()
-                        .and_then(|dbe| dbe.code().map(|c| c.to_string()));
-                    if pg_err.as_deref() == Some("40001") || pg_err.as_deref() == Some("40P01") {
+                    let result = f(&db);
+                    let emitted = db.emitted.into_inner();
+                    let armed = db.armed.into_inner();
+                    let tx = db.tx.into_inner();
+                    (result, emitted, armed, tx)
+                });
+
+                let result = match result {
+                    Ok(v) => v,
+                    Err(StorageError::Serialization) => {
                         if attempt < MAX_RETRIES {
+                            tracing::warn!(
+                                attempt = attempt + 1,
+                                "Serialization failure (40001) in query, retrying"
+                            );
                             continue;
                         }
                         return Err(StorageError::Serialization);
                     }
-                    return Err(StorageError::from(e));
+                    Err(e) => return Err(e),
+                };
+
+                match tokio::task::block_in_place(|| {
+                    tokio::runtime::Handle::current().block_on(tx.commit())
+                }) {
+                    Ok(_) => return Ok((result, emitted, armed)),
+                    Err(e) => {
+                        let pg_err = e
+                            .as_database_error()
+                            .and_then(|dbe| dbe.code().map(|c| c.to_string()));
+                        if pg_err.as_deref() == Some("40001") || pg_err.as_deref() == Some("40P01")
+                        {
+                            if attempt < MAX_RETRIES {
+                                continue;
+                            }
+                            return Err(StorageError::Serialization);
+                        }
+                        return Err(StorageError::from(e));
+                    }
                 }
             }
-        }
 
-        unreachable!("transact loop completed without returning")
+            unreachable!("transact loop completed without returning")
+        })
+        .await
     }
 
     /// One operation: run it, and turn a storage failure into a response.

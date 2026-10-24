@@ -35,5 +35,6 @@ pub mod server;
 pub mod store;
 pub mod timer_queue;
 pub mod timerd;
+pub mod traced_store;
 
 pub use plugin::{Config, PLUGIN};
