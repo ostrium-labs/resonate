@@ -281,9 +281,7 @@ impl ResonateServer for OracleServer {
                     address,
                     Message::Execute(ExecuteMsg {
                         kind: "execute".to_string(),
-                        head: MessageHead {
-                            server_url: SERVER_URL.to_string(),
-                        },
+                        head: MessageHead::new(SERVER_URL.to_string()),
                         data: ExecuteMsgData {
                             task: ExecuteMsgTask {
                                 id: task_id,
@@ -296,7 +294,7 @@ impl ResonateServer for OracleServer {
                     address,
                     Message::Unblock(UnblockMsg {
                         kind: "unblock".to_string(),
-                        head: UnblockMsgHead {},
+                        head: UnblockMsgHead::default(),
                         data: UnblockMsgData { promise },
                     }),
                 ),

@@ -130,6 +130,9 @@ impl Server {
         router: Arc<dyn ResonateRouter>,
         cfg: ServerCfg,
     ) -> Arc<Self> {
+        // Traced here, once, so every store this server is ever handed — and
+        // every service below that reads it — is measured the same way.
+        let store: Arc<dyn Store> = Arc::new(super::traced_store::TracedStore::new(store));
         let cache: Arc<dyn DocCache> = Arc::new(MemDocCache::new(cfg.cache_capacity));
         // Under the debug flag the sender holds messages for the life of the
         // process — they sit in `debug.snap` instead of leaving, which is

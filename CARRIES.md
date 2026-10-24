@@ -38,6 +38,7 @@ State is as of 2026-10-24. "Upstream" means a PR on `resonatehq/resonate`.
 | `resonate-auth`: jsonwebtoken 10.3 on aws-lc-rs; unsigned mode without the deprecated switch | `fix/auth-jsonwebtoken-10` | Not opened (needs the owner's approval) | Branch ready on `main` | GHSA-h395-gr6q-cpjc |
 | xtask: resolve the target directory through `cargo metadata` | in FW0 | Not opened | Carried | `porcupine` assumed `<workspace>/target`. It breaks under a configured `build.target-dir` or `CARGO_TARGET_DIR` |
 | FW3: `resonate-client` (typed Rust protocol client, HTTP and in process, retries, auth hook) and the public protocol entry in `resonate-gateway-http` (`protocol_router`, `handle_envelope`, `answer_envelope`, `ProtocolOptions`) | `fw3/resonate-client` | Not opened; both parts are upstreamable as they stand | [#4](https://github.com/ostrium-labs/resonate/pull/4) into `loams/main` | Loams' Temporal gateway (`loams-temporal-resonate`) and `loams-worker` call Resonate only through this client (design 74 D1516), and `loams-durable` can mount the endpoint per tenant instead of keeping a copy of `handle_api` |
+| FW10: OpenTelemetry tracing (OTLP), `traceparent` across create → task → settle, store-op latency histogram, `cargo xtask bench` | `fw10/tracing-bench` | Not opened | [#5](https://github.com/ostrium-labs/resonate/pull/5) into `loams/main` | Benchmarks and traces for DX3 and the bench comparison (design 74 §7.4 FW10) |
 
 Fork work items (Loams design 74 §7.4) are added to this table as their PRs
 merge into `loams/main`.

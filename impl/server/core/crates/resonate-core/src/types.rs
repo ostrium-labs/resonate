@@ -174,10 +174,29 @@ pub struct ResponseHead {
 
 // --- Outgoing Message Types ---
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
 pub struct MessageHead {
     #[serde(rename = "serverUrl")]
     pub server_url: String,
+    /// The W3C trace context of the work this message starts, for a worker
+    /// to continue: its `task.*` requests carry it back as the `traceparent`
+    /// header. Absent unless the promise was created in a trace, so a message
+    /// nobody traced reads exactly as it always has.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub traceparent: Option<String>,
+    /// Vendor trace state beside [`traceparent`](Self::traceparent).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tracestate: Option<String>,
+}
+
+impl MessageHead {
+    /// A head naming where to call back, and no trace.
+    pub fn new(server_url: impl Into<String>) -> Self {
+        Self {
+            server_url: server_url.into(),
+            ..Self::default()
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -198,9 +217,17 @@ pub struct ExecuteMsgTask {
     pub version: i64,
 }
 
-/// Head of an `unblock` message. Empty on the wire, unlike [`MessageHead`].
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-pub struct UnblockMsgHead {}
+/// Head of an `unblock` message. Empty on the wire unless the promise it
+/// carries was created in a trace, unlike [`MessageHead`].
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+pub struct UnblockMsgHead {
+    /// The trace the unblocked promise belongs to. See
+    /// [`MessageHead::traceparent`].
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub traceparent: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tracestate: Option<String>,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct UnblockMsg {
@@ -1325,9 +1352,7 @@ mod tests {
     fn message_serializes_with_sorted_keys_like_the_value_hop() {
         let msg = Message::Execute(ExecuteMsg {
             kind: "execute".to_string(),
-            head: MessageHead {
-                server_url: "http://localhost:8001".to_string(),
-            },
+            head: MessageHead::new("http://localhost:8001".to_string()),
             data: ExecuteMsgData {
                 task: ExecuteMsgTask {
                     id: "t1".to_string(),
@@ -1349,9 +1374,7 @@ mod tests {
     fn execute_message_wire_format() {
         let msg = Message::Execute(ExecuteMsg {
             kind: "execute".to_string(),
-            head: MessageHead {
-                server_url: "http://localhost:8001".to_string(),
-            },
+            head: MessageHead::new("http://localhost:8001".to_string()),
             data: ExecuteMsgData {
                 task: ExecuteMsgTask {
                     id: "t1".to_string(),
@@ -1479,7 +1502,7 @@ mod tests {
         let expected_promise = serde_json::to_value(&promise).unwrap();
         let msg = Message::Unblock(UnblockMsg {
             kind: "unblock".to_string(),
-            head: UnblockMsgHead {},
+            head: UnblockMsgHead::default(),
             data: UnblockMsgData { promise },
         });
         // Note the empty head — unblock has never carried a serverUrl.

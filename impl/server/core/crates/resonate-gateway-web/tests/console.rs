@@ -278,7 +278,11 @@ fn merged() -> Router {
     // Panics if the two claim the same method on the same path — `POST /` and
     // `GET /` are the pair that has to stay apart.
     resonate_gateway_http::routes::api_routes()
-        .with_state(resonate_gateway_http::AppState { server, auth: None })
+        .with_state(resonate_gateway_http::AppState {
+            server,
+            auth: None,
+            trace_tags: false,
+        })
         .merge(console)
 }
 

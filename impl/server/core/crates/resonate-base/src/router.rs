@@ -15,6 +15,8 @@ use resonate_plugin::prometheus::{register_counter_vec, CounterVec};
 
 use resonate_core::types::Message;
 use resonate_core::{scheme_of, Cause, ResonateRouter, ResonateWorker, Unavailable};
+use resonate_trace::{TraceContexts, TraceParent};
+use tracing::Instrument;
 
 lazy_static! {
     /// Hand-offs to a worker, by outcome. Declared here because this is the one
@@ -50,6 +52,9 @@ pub struct Router {
     /// alternatives were a handle to a server that did not exist yet, or
     /// interior mutability inside every server plugin.
     workers: OnceLock<HashMap<String, Arc<dyn ResonateWorker>>>,
+    /// The trace each promise was created in, filed by the traced server and
+    /// read here, so a message carries the trace of the work it starts.
+    contexts: Arc<TraceContexts>,
 }
 
 impl Default for Router {
@@ -64,7 +69,14 @@ impl Router {
     pub fn new() -> Self {
         Self {
             workers: OnceLock::new(),
+            contexts: Arc::new(TraceContexts::default()),
         }
+    }
+
+    /// Where promises' traces are filed. The traced server writes it, and
+    /// [`route`](ResonateRouter::route) reads it.
+    pub fn contexts(&self) -> Arc<TraceContexts> {
+        Arc::clone(&self.contexts)
     }
 
     /// Hand it the workers. Complete from here, and never changed again.
@@ -87,7 +99,78 @@ impl Router {
     }
 }
 
+/// The promise a message is about: an execute message's task, which shares its
+/// promise's id, or an unblock message's promise.
+fn subject(msg: &Message) -> &str {
+    match msg {
+        Message::Execute(m) => &m.data.task.id,
+        Message::Unblock(m) => &m.data.promise.id,
+    }
+}
+
+/// `msg`, carrying `tp` as the trace of the work it starts.
+fn with_trace(msg: &Message, tp: &TraceParent) -> Message {
+    let mut msg = msg.clone();
+    let traceparent = Some(tp.traceparent().to_string());
+    let tracestate = tp.tracestate().map(str::to_string);
+    match &mut msg {
+        Message::Execute(m) => {
+            m.head.traceparent = traceparent;
+            m.head.tracestate = tracestate;
+        }
+        Message::Unblock(m) => {
+            m.head.traceparent = traceparent;
+            m.head.tracestate = tracestate;
+        }
+    }
+    msg
+}
+
 impl Router {
+    /// Route one message inside its own span, parented on the trace its
+    /// promise was created in.
+    ///
+    /// The span's parent is the filed trace when there is one and it is not
+    /// the trace already current — a retry fired by a timer, a resume caused
+    /// by another promise settling — and whatever is current otherwise. The
+    /// message then carries this span as its parent, so the worker's requests
+    /// continue from the hand-off. Without an OpenTelemetry layer there is no
+    /// span to name, and the filed context is passed on as it was filed.
+    async fn route_traced(&self, address: &str, msg: &Message) -> Result<(), Unavailable> {
+        let (kind, id) = match msg {
+            Message::Execute(_) => ("execute", subject(msg)),
+            Message::Unblock(_) => ("unblock", subject(msg)),
+        };
+        let filed = self.contexts.get(id).or_else(|| match msg {
+            Message::Unblock(m) => resonate_trace::from_tags(&m.data.promise.tags),
+            Message::Execute(_) => None,
+        });
+        let span = tracing::info_span!(
+            "resonate.route",
+            otel.name = %format_args!("route {kind}"),
+            otel.kind = "producer",
+            resonate.message.kind = kind,
+            resonate.promise.id = %id,
+            resonate.address.scheme = scheme_of(address).as_deref().unwrap_or(""),
+        );
+        if let Some(tp) = &filed {
+            let current = resonate_trace::current();
+            if current.as_ref().map(|c| c.trace_id()) != Some(tp.trace_id()) {
+                resonate_trace::set_parent(&span, tp);
+            }
+        }
+        let carried = resonate_trace::of(&span).or(filed);
+        let traced;
+        let msg = match &carried {
+            Some(tp) => {
+                traced = with_trace(msg, tp);
+                &traced
+            }
+            None => msg,
+        };
+        self.route_inner(address, msg).instrument(span).await
+    }
+
     async fn route_inner(&self, address: &str, msg: &Message) -> Result<(), Unavailable> {
         let scheme = scheme_of(address)
             .ok_or_else(|| Unavailable::unroutable(format!("address is not a URI: {address}")))?;
@@ -116,7 +199,7 @@ impl ResonateRouter for Router {
         // and Pub/Sub workers enqueue onto a bounded channel and deliver
         // asynchronously past it, so `success` here means accepted for
         // delivery.
-        let outcome = self.route_inner(address, msg).await;
+        let outcome = self.route_traced(address, msg).await;
         DELIVERIES_TOTAL
             .with_label_values(&[match &outcome {
                 Ok(()) => "success",
@@ -184,9 +267,7 @@ mod tests {
     fn execute_msg() -> Message {
         Message::Execute(ExecuteMsg {
             kind: "execute".to_string(),
-            head: MessageHead {
-                server_url: "http://localhost:8001".to_string(),
-            },
+            head: MessageHead::new("http://localhost:8001".to_string()),
             data: ExecuteMsgData {
                 task: ExecuteMsgTask {
                     id: "t1".to_string(),
@@ -323,6 +404,33 @@ mod tests {
             .await
             .expect_err("no workers yet");
         assert_eq!(err.cause, Cause::Unroutable);
+    }
+
+    #[tokio::test]
+    async fn a_filed_trace_rides_on_the_message_without_any_exporter() {
+        // No subscriber at all: the context is passed on as it was filed.
+        let tp = "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01";
+        let stub = Arc::new(RecordingWorker::new());
+        let router = router_with("poll", stub.clone());
+        router
+            .contexts()
+            .insert("t1", TraceParent::parse(tp, Some("k=v")).unwrap());
+        router.route("poll://any@g", &execute_msg()).await.unwrap();
+        let calls = stub.calls();
+        assert_eq!(calls[0].1["head"]["traceparent"], tp);
+        assert_eq!(calls[0].1["head"]["tracestate"], "k=v");
+    }
+
+    #[tokio::test]
+    async fn an_untraced_message_reads_as_it_always_has() {
+        let stub = Arc::new(RecordingWorker::new());
+        let router = router_with("poll", stub.clone());
+        router.route("poll://any@g", &execute_msg()).await.unwrap();
+        let head = &stub.calls()[0].1["head"];
+        assert_eq!(
+            head,
+            &serde_json::json!({"serverUrl": "http://localhost:8001"})
+        );
     }
 
     #[tokio::test]

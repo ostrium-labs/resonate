@@ -56,6 +56,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
+use tracing::Instrument;
 
 use resonate_core::Unavailable;
 
@@ -168,12 +169,33 @@ impl Timerd {
 
     /// Sweep every target, then collect its keys. In that order, always.
     async fn sweep(&self, due: Vec<(TimerEntry, Vec<String>)>, now: i64) -> u64 {
+        let span = tracing::info_span!("resonate.timer.fire", resonate.timeouts = due.len());
+        self.sweep_targets(due, now).instrument(span).await
+    }
+
+    async fn sweep_targets(&self, due: Vec<(TimerEntry, Vec<String>)>, now: i64) -> u64 {
         let mut swept = 0u64;
         for (entry, keys) in due {
             let outcome = match &entry {
-                TimerEntry::Origin { origin, .. } => self.applier.tick(origin, now).await,
+                TimerEntry::Origin { origin, .. } => {
+                    let span = tracing::info_span!(
+                        "resonate.timer.timeout",
+                        otel.name = "timeout origin",
+                        resonate.timeout.kind = "origin",
+                        resonate.timeout.id = %origin,
+                    );
+                    self.applier.tick(origin, now).instrument(span).await
+                }
                 TimerEntry::Schedule { id, deadline } => match &self.schedules {
-                    Some(firer) => firer.fire(id, *deadline, now).await,
+                    Some(firer) => {
+                        let span = tracing::info_span!(
+                            "resonate.timer.timeout",
+                            otel.name = "timeout schedule",
+                            resonate.timeout.kind = "schedule",
+                            resonate.timeout.id = %id,
+                        );
+                        firer.fire(id, *deadline, now).instrument(span).await
+                    }
                     None => {
                         tracing::warn!(schedule_id = %id, "Schedule timer fired with no schedule service configured");
                         Ok(())

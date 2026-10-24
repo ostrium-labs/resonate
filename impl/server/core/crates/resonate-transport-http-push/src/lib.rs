@@ -175,6 +175,7 @@ use reqwest::Client;
 use tokio::sync::{mpsc, Semaphore};
 
 use async_trait::async_trait;
+use tracing::Instrument;
 
 use resonate_plugin::types::Message;
 use resonate_plugin::{ResonateServer, ResonateWorker, Unavailable};
@@ -318,6 +319,20 @@ impl Auth {
 struct DeliveryJob {
     address: HttpAddress,
     payload: serde_json::Value,
+    /// The trace the message carries, sent as the W3C headers too, so a
+    /// worker reading headers rather than the body continues it.
+    trace: Option<resonate_trace::TraceParent>,
+    /// The delivery's span, which the request is sent inside.
+    span: tracing::Span,
+}
+
+/// The trace context a message carries in its head.
+fn carried(msg: &Message) -> Option<resonate_trace::TraceParent> {
+    let (tp, ts) = match msg {
+        Message::Execute(m) => (m.head.traceparent.as_deref(), m.head.tracestate.as_deref()),
+        Message::Unblock(m) => (m.head.traceparent.as_deref(), m.head.tracestate.as_deref()),
+    };
+    resonate_trace::TraceParent::parse(tp?, ts)
 }
 
 pub struct HttpPushTransport {
@@ -381,7 +396,14 @@ impl HttpPushTransport {
         let job = DeliveryJob {
             address: address.clone(),
             payload: payload.clone(),
+            trace: None,
+            span: tracing::Span::current(),
         };
+        self.enqueue(job).await
+    }
+
+    /// Put a job on the queue.
+    async fn enqueue(&self, job: DeliveryJob) -> Result<(), Unavailable> {
         // Clone the sender out before awaiting — the guard must not be held
         // across the await point.
         let tx = match self.tx.lock().expect("http push tx mutex").clone() {
@@ -430,13 +452,25 @@ impl ResonateWorker for HttpPushTransport {
     async fn process(&self, address: &str, msg: &Message) -> Result<(), Unavailable> {
         let payload = serde_json::to_value(msg)
             .map_err(|e| Unavailable::new(format!("cannot serialize message: {e}")))?;
-        HttpPushTransport::send(
-            self,
-            &HttpAddress {
+        let trace = carried(msg);
+        // Created here, in the router's span, and carried with the job: the
+        // send itself happens later on the dispatcher's task.
+        let span = tracing::info_span!(
+            "resonate.deliver",
+            otel.name = "deliver http",
+            otel.kind = "client",
+            resonate.message.kind = payload["kind"].as_str().unwrap_or(""),
+            url.full = %address,
+            http.response.status_code = tracing::field::Empty,
+        );
+        self.enqueue(DeliveryJob {
+            address: HttpAddress {
                 url: address.to_string(),
             },
-            &payload,
-        )
+            payload,
+            trace,
+            span,
+        })
         .await
     }
 }
@@ -457,15 +491,24 @@ async fn dispatcher(
         };
         let client = client.clone();
         let auth = Arc::clone(&auth);
-        tokio::spawn(async move {
-            let _permit = permit;
-            deliver(client, auth, job).await;
-        });
+        let span = job.span.clone();
+        tokio::spawn(
+            async move {
+                let _permit = permit;
+                deliver(client, auth, job).await;
+            }
+            .instrument(span),
+        );
     }
 }
 
 async fn deliver(client: Client, auth: Arc<Auth>, job: DeliveryJob) {
-    let DeliveryJob { address, payload } = job;
+    let DeliveryJob {
+        address,
+        payload,
+        trace,
+        span,
+    } = job;
     let auth_header = auth.resolve(&address.url).await;
 
     let mut request = client
@@ -477,9 +520,19 @@ async fn deliver(client: Client, auth: Arc<Auth>, job: DeliveryJob) {
         request = request.header(name, value);
     }
 
+    // This delivery as the parent when there is a trace to name it in; the
+    // message's own context, as it came, when nothing exports spans.
+    if let Some(tp) = trace.and_then(|tp| resonate_trace::of(&span).or(Some(tp))) {
+        request = request.header(resonate_trace::TRACEPARENT, tp.traceparent());
+        if let Some(state) = tp.tracestate() {
+            request = request.header(resonate_trace::TRACESTATE, state);
+        }
+    }
+
     match request.send().await {
         Ok(resp) => {
             let status = resp.status().as_u16();
+            span.record("http.response.status_code", status);
             if resp.status().is_success() {
                 tracing::debug!(address = %address.url, status, "HTTP push delivery succeeded");
             } else {

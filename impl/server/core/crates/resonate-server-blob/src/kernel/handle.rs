@@ -105,9 +105,7 @@ impl Tx {
             address,
             Message::Execute(ExecuteMsg {
                 kind: "execute".to_string(),
-                head: MessageHead {
-                    server_url: self.server_url.clone(),
-                },
+                head: MessageHead::new(self.server_url.clone()),
                 data: ExecuteMsgData {
                     task: ExecuteMsgTask {
                         id: task_id.to_string(),
@@ -1025,7 +1023,7 @@ pub(crate) fn trigger_listeners(tx: &mut Tx, id: &str) {
             address,
             Message::Unblock(UnblockMsg {
                 kind: "unblock".to_string(),
-                head: UnblockMsgHead {},
+                head: UnblockMsgHead::default(),
                 data: UnblockMsgData {
                     promise: promise.clone(),
                 },
@@ -1086,9 +1084,7 @@ mod tests {
             address.to_string(),
             Message::Execute(resonate_core::types::ExecuteMsg {
                 kind: "execute".into(),
-                head: resonate_core::types::MessageHead {
-                    server_url: String::new(),
-                },
+                head: resonate_core::types::MessageHead::new(String::new()),
                 data: resonate_core::types::ExecuteMsgData {
                     task: resonate_core::types::ExecuteMsgTask {
                         id: task_id.into(),

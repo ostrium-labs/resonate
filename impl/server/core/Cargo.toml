@@ -18,6 +18,7 @@ members = [
     "crates/resonate-server-neo4j",
     "crates/resonate-oracle",
     "crates/resonate-timer-wheel",
+    "crates/resonate-trace",
     "crates/resonate-transport-gcps",
     "crates/resonate-transport-http-poll",
     "crates/resonate-transport-http-push",
@@ -113,3 +114,12 @@ serde_json = { workspace = true }
 base64 = "0.22"
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 fastrand = "2"
+# `tests/tracing.rs`: one trace across create, task and settle, exported to
+# memory. The same versions resonate-trace builds on.
+opentelemetry = { version = "0.31", default-features = false, features = ["trace"] }
+opentelemetry_sdk = { version = "0.31", default-features = false, features = ["trace", "testing"] }
+tracing = "0.1"
+tracing-opentelemetry = { version = "0.32", default-features = false }
+tracing-subscriber = { version = "0.3", default-features = false, features = ["registry", "std"] }
+tower = { version = "0.5", features = ["util"] }
+http-body-util = "0.1"

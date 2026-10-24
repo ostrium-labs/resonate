@@ -56,6 +56,8 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use clap::{Args, Parser, Subcommand, ValueEnum};
 use sqlx::Connection;
 
+mod bench;
+
 #[derive(Parser)]
 #[command(name = "cargo xtask", about = "The one way to run what CI runs.")]
 struct Cli {
@@ -90,6 +92,17 @@ enum Job {
         db: DbArgs,
         #[command(flatten)]
         porc: PorcArgs,
+    },
+    /// Promise create/settle throughput, task claim latency and timer
+    /// accuracy against a live release server on its own fresh database — or
+    /// against `--server-url`.
+    Bench {
+        #[arg(long)]
+        backend: bench::BenchBackend,
+        #[command(flatten)]
+        db: DbArgs,
+        #[command(flatten)]
+        bench: bench::BenchArgs,
     },
     /// Every job above, for every backend the admin URLs reach.
     All {
@@ -157,6 +170,7 @@ async fn main() {
         Job::Check => check(),
         Job::Differential { backend, seeds, db } => differential(backend, &seeds, &db).await,
         Job::Porcupine { backend, db, porc } => porcupine(backend, &db, &porc).await,
+        Job::Bench { backend, db, bench } => bench::bench(backend, &db, &bench).await,
         Job::All { db, porc } => all(&db, &porc).await,
     };
     if let Err(e) = result {
@@ -635,6 +649,47 @@ fn scratch(purpose: &str) -> Result<PathBuf> {
     Ok(dir)
 }
 
+/// Point a `resonate serve` at `backend`: the server plugin, and the fresh
+/// database `url` names.
+fn server_env(server: &mut Command, backend: Backend, url: Option<&str>, db: &DbArgs, dir: &Path) {
+    match backend {
+        Backend::Postgres => {
+            server
+                .env("RESONATE_SERVERS__ACTIVE", "server_postgres")
+                .env(
+                    "RESONATE_SERVERS__SERVER_POSTGRES__URL",
+                    url.expect("fresh"),
+                );
+        }
+        Backend::Mysql | Backend::Tidb => {
+            server
+                .env("RESONATE_SERVERS__ACTIVE", "server_mysql")
+                .env("RESONATE_SERVERS__SERVER_MYSQL__URL", url.expect("fresh"));
+        }
+        Backend::Neo4j => {
+            server
+                .env("RESONATE_SERVERS__ACTIVE", "server_neo4j")
+                .env("RESONATE_SERVERS__SERVER_NEO4J__URI", url.expect("fresh"))
+                .env("RESONATE_SERVERS__SERVER_NEO4J__USER", &db.neo4j_user)
+                .env(
+                    "RESONATE_SERVERS__SERVER_NEO4J__PASSWORD",
+                    &db.neo4j_password,
+                );
+        }
+        Backend::Blob => {
+            // No bucket: the in-process object store, fresh with the
+            // process, with real conditional-write semantics.
+            server.env("RESONATE_SERVERS__ACTIVE", "server_blob");
+        }
+        Backend::Sqlite => {
+            server.env("RESONATE_SERVERS__ACTIVE", "server_sqlite").env(
+                "RESONATE_SERVERS__SERVER_SQLITE__PATH",
+                dir.join("resonate.db"),
+            );
+        }
+    }
+}
+
 async fn porcupine(backend: Backend, db: &DbArgs, porc: &PorcArgs) -> Result<()> {
     let spec = spec_dir(porc)?;
     if Command::new("go").arg("version").output().is_err() {
@@ -676,42 +731,7 @@ async fn porcupine(backend: Backend, db: &DbArgs, porc: &PorcArgs) -> Result<()>
             .stderr(Stdio::from(
                 std::fs::File::create(dir.join("server.err")).map_err(|e| e.to_string())?,
             ));
-        match backend {
-            Backend::Postgres => {
-                server
-                    .env("RESONATE_SERVERS__ACTIVE", "server_postgres")
-                    .env(
-                        "RESONATE_SERVERS__SERVER_POSTGRES__URL",
-                        url.expect("fresh"),
-                    );
-            }
-            Backend::Mysql | Backend::Tidb => {
-                server
-                    .env("RESONATE_SERVERS__ACTIVE", "server_mysql")
-                    .env("RESONATE_SERVERS__SERVER_MYSQL__URL", url.expect("fresh"));
-            }
-            Backend::Neo4j => {
-                server
-                    .env("RESONATE_SERVERS__ACTIVE", "server_neo4j")
-                    .env("RESONATE_SERVERS__SERVER_NEO4J__URI", url.expect("fresh"))
-                    .env("RESONATE_SERVERS__SERVER_NEO4J__USER", &db.neo4j_user)
-                    .env(
-                        "RESONATE_SERVERS__SERVER_NEO4J__PASSWORD",
-                        &db.neo4j_password,
-                    );
-            }
-            Backend::Blob => {
-                // No bucket: the in-process object store, fresh with the
-                // process, with real conditional-write semantics.
-                server.env("RESONATE_SERVERS__ACTIVE", "server_blob");
-            }
-            Backend::Sqlite => {
-                server.env("RESONATE_SERVERS__ACTIVE", "server_sqlite").env(
-                    "RESONATE_SERVERS__SERVER_SQLITE__PATH",
-                    dir.join("resonate.db"),
-                );
-            }
-        }
+        server_env(&mut server, backend, url, db, &dir);
         eprintln!("\n==> server on 127.0.0.1:{port} ({dir:?})");
         let _server = Server(server.spawn().map_err(|e| format!("server: {e}"))?);
         let started = Instant::now();

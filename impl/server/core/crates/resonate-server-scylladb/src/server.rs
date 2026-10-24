@@ -216,9 +216,7 @@ impl Server {
                         address,
                         Message::Execute(ExecuteMsg {
                             kind: "execute".to_string(),
-                            head: MessageHead {
-                                server_url: server_url.clone(),
-                            },
+                            head: MessageHead::new(server_url.clone()),
                             data: ExecuteMsgData {
                                 task: ExecuteMsgTask {
                                     id: task_id,
@@ -237,7 +235,7 @@ impl Server {
                         address,
                         Message::Unblock(UnblockMsg {
                             kind: "unblock".to_string(),
-                            head: UnblockMsgHead {},
+                            head: UnblockMsgHead::default(),
                             data: UnblockMsgData { promise },
                         }),
                     )

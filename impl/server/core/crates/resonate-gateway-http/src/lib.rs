@@ -115,6 +115,16 @@ pub struct Config {
     /// carries on.
     #[serde(default)]
     pub abort_on_panic: bool,
+
+    /// Keep a request's `traceparent` header in the tags of the promise it
+    /// creates, when the client set no `traceparent` tag of its own.
+    ///
+    /// Off by default: a tag the client did not write changes what every
+    /// later read of that promise answers. On, a client that only sends the
+    /// header gets what a client that sets the tag gets — a trace that
+    /// outlives this process.
+    #[serde(default)]
+    pub trace_tags: bool,
 }
 
 fn yes() -> bool {
@@ -134,6 +144,7 @@ impl Default for Config {
             auth: None,
             workos: None,
             abort_on_panic: false,
+            trace_tags: false,
         }
     }
 }
@@ -308,6 +319,7 @@ impl ResonateGateway for HttpGateway {
             routes::AppState {
                 server: Arc::clone(&self.server),
                 auth,
+                trace_tags: self.config.trace_tags,
             },
             &self.config,
             extra,

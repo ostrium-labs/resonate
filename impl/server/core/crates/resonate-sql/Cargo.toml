@@ -22,6 +22,7 @@ mysql = ["sqlx/mysql"]
 resonate-core = { version = "0.10.1", path = "../resonate-core" }
 resonate-plugin = { version = "0.10.1", path = "../resonate-plugin" }
 resonate-timer-wheel = { version = "0.10.1", path = "../resonate-timer-wheel" }
+resonate-trace = { version = "0.10.1", path = "../resonate-trace" }
 async-trait = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

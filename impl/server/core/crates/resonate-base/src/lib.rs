@@ -25,6 +25,7 @@
 //! ```
 
 pub mod router;
+pub mod traced;
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -36,6 +37,7 @@ use resonate_plugin::{
 use serde::{Deserialize, Serialize};
 
 pub use router::Router;
+pub use traced::Traced;
 
 // What a composition root needs, so a custom binary names one dependency for
 // the wiring and one per plugin — rather than `resonate-plugin` as well, to say
@@ -182,10 +184,81 @@ pub async fn run(registry: Registry, options: Options) -> Result<(), String> {
     let config = load(&options)?;
     let process: Process = config.extract().map_err(|e| e.to_string())?;
 
+    let exporter = install_subscriber(&process)?;
+    let result = serve(registry, options, config, process).await;
+    // Last, so the spans of the drain are in what is flushed.
+    if let Some(exporter) = exporter {
+        let _ = tokio::task::spawn_blocking(move || exporter.shutdown()).await;
+    }
+    result
+}
+
+/// The process's subscriber: logs at the configured level and, when the
+/// standard `OTEL_*` environment names an endpoint, spans exported over OTLP.
+///
+/// Here and only here, because only the process owner may install one. An
+/// embedder calls [`build`] and brings its own subscriber; every span in the
+/// workspace is a `tracing` span, so it lands in whatever that is.
+fn install_subscriber(process: &Process) -> Result<Option<Exporter>, String> {
+    use tracing_subscriber::layer::SubscriberExt;
+    use tracing_subscriber::util::SubscriberInitExt;
+    use tracing_subscriber::Layer;
+
+    use tracing_subscriber::filter::FilterExt;
+
     let filter = tracing_subscriber::EnvFilter::try_from_default_env()
         .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new(&process.level));
-    tracing_subscriber::fmt().with_env_filter(filter).init();
+    // The log does not see the spans, so a log line reads as it did before
+    // there were any: the request's kind and correlation id are already in
+    // its fields, and a prefix repeating them on every line is noise.
+    let unscoped = tracing_subscriber::filter::filter_fn(|meta| {
+        !(meta.is_span() && meta.name().starts_with("resonate."))
+    });
+    let exporter = exporter_from_env()?;
+    let otel = exporter.as_ref().map(|e| e.layer());
+    tracing_subscriber::registry()
+        .with(tracing_subscriber::fmt::layer().with_filter(filter.and(unscoped)))
+        .with(otel)
+        .init();
+    if exporter.is_some() {
+        tracing::info!("Exporting traces over OTLP");
+    }
+    Ok(exporter)
+}
 
+#[cfg(feature = "otlp")]
+type Exporter = resonate_trace::otlp::Exporter;
+
+#[cfg(feature = "otlp")]
+fn exporter_from_env() -> Result<Option<Exporter>, String> {
+    Exporter::from_env()
+}
+
+/// Built without the exporter: nothing to install, whatever the environment.
+#[cfg(not(feature = "otlp"))]
+struct Exporter;
+
+#[cfg(not(feature = "otlp"))]
+impl Exporter {
+    fn layer(&self) -> tracing_subscriber::layer::Identity {
+        tracing_subscriber::layer::Identity::new()
+    }
+
+    fn shutdown(self) {}
+}
+
+#[cfg(not(feature = "otlp"))]
+fn exporter_from_env() -> Result<Option<Exporter>, String> {
+    Ok(None)
+}
+
+/// Everything `run` does once the subscriber is up.
+async fn serve(
+    registry: Registry,
+    options: Options,
+    config: Configuration,
+    process: Process,
+) -> Result<(), String> {
     // After the subscriber, because half of what it reports is a warning, and
     // before anything is built, because the other half is fatal.
     check_key_space(&registry, &config)?;
@@ -320,6 +393,7 @@ pub fn build(
     //    socket, and the gateway that has a listener merges them.
     let router = Arc::new(Router::new());
     let routes = Routes::new();
+    let contexts = router.contexts();
 
     // 2. The server this binary was pointed at. Nothing is connected yet —
     //    opening the database is `init`'s, like every other port's resource.
@@ -340,6 +414,9 @@ pub fn build(
         ServerDependencies::new(Arc::clone(&router) as Arc<dyn ResonateRouter>),
     )
     .map_err(|e| e.to_string())?;
+    // Traced, before anything holds it, so every caller of the port — the
+    // gateways, a worker calling back in process — goes through the span.
+    let server: Arc<dyn ResonateServer> = Arc::new(Traced::new(server, contexts));
     tracing::info!(server = %chosen.id(), "Server plugin selected");
 
     // 3. The workers, each downgrading the server that now exists.

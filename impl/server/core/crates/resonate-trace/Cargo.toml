@@ -1,0 +1,32 @@
+[package]
+name = "resonate-trace"
+description = "Tracing for a Resonate server: W3C trace context across requests and messages, and the OTLP exporter a binary may install."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+name = "resonate_trace"
+path = "src/lib.rs"
+
+[dependencies]
+resonate-core = { version = "0.10.1", path = "../resonate-core" }
+resonate-plugin = { version = "0.10.1", path = "../resonate-plugin" }
+lazy_static = "1"
+opentelemetry = { version = "0.31", default-features = false, features = ["trace"] }
+serde_json = { workspace = true }
+tokio = { version = "1", features = ["rt"] }
+tracing = "0.1"
+tracing-opentelemetry = { version = "0.32", default-features = false }
+tracing-subscriber = { version = "0.3", default-features = false, features = ["registry", "std"] }
+opentelemetry_sdk = { version = "0.31", default-features = false, features = ["trace"], optional = true }
+opentelemetry-otlp = { version = "0.31", default-features = false, features = ["trace", "grpc-tonic", "http-proto", "reqwest-blocking-client", "reqwest-rustls", "tls-roots"], optional = true }
+
+[features]
+default = []
+# The OTLP exporter. Only a binary that owns the process installs one, so only
+# a binary needs it; an embedder that brings its own subscriber leaves it off.
+otlp = ["dep:opentelemetry_sdk", "dep:opentelemetry-otlp"]
+
+[dev-dependencies]
+tokio = { version = "1", features = ["rt", "macros"] }

@@ -122,6 +122,7 @@ use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Weak};
 use tokio::sync::{mpsc, Mutex};
+use tracing::Instrument;
 
 use resonate_plugin::types::Message;
 use resonate_plugin::{ResonateServer, ResonateWorker, Unavailable};
@@ -367,10 +368,34 @@ impl ResonateWorker for PollRegistry {
         // has no `preserve_order`, so a `Value` map is a BTreeMap and emits keys
         // alphabetically — which is what SSE consumers have always received.
         // Going direct would emit declaration order instead and change the bytes.
-        let body = serde_json::to_value(msg)
-            .and_then(|v| serde_json::to_string(&v))
+        let mut value = serde_json::to_value(msg)
             .map_err(|e| Unavailable::new(format!("cannot serialize message: {e}")))?;
-        if PollRegistry::send_poll(self, &addr, &body).await {
+        let span = tracing::info_span!(
+            "resonate.deliver",
+            otel.name = "deliver poll",
+            otel.kind = "producer",
+            resonate.message.kind = value["kind"].as_str().unwrap_or(""),
+            resonate.poll.group = %addr.group,
+            resonate.delivered = tracing::field::Empty,
+        );
+        // A message that carries a trace carries this delivery as its parent
+        // when spans are exported. The frame is the only channel to the
+        // worker, so the context goes in its `head`, where the router put it.
+        if value["head"].get("traceparent").is_some() {
+            if let Some(tp) = resonate_trace::of(&span) {
+                value["head"]["traceparent"] = tp.traceparent().into();
+                if let Some(state) = tp.tracestate() {
+                    value["head"]["tracestate"] = state.into();
+                }
+            }
+        }
+        let body = serde_json::to_string(&value)
+            .map_err(|e| Unavailable::new(format!("cannot serialize message: {e}")))?;
+        let delivered = PollRegistry::send_poll(self, &addr, &body)
+            .instrument(span.clone())
+            .await;
+        span.record("resonate.delivered", delivered);
+        if delivered {
             Ok(())
         } else {
             Err(Unavailable::new(format!(

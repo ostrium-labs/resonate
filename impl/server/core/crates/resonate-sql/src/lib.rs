@@ -26,6 +26,10 @@ pub mod migrate;
 pub mod server;
 pub mod sweep;
 
+/// One span and one latency sample per transaction, shared by the family so
+/// the three engines name theirs alike.
+pub use resonate_trace::store_op;
+
 use resonate_core::types::{PromiseRecord, ResponseEnvelope, TaskState};
 use resonate_core::ui::UiError;
 

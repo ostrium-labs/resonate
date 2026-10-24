@@ -12,12 +12,20 @@ path = "src/lib.rs"
 [dependencies]
 resonate-core = { version = "0.10.1", path = "../resonate-core" }
 resonate-plugin = { version = "0.10.1", path = "../resonate-plugin" }
+resonate-trace = { version = "0.10.1", path = "../resonate-trace" }
 async-trait = { workspace = true }
 lazy_static = "1"
 serde = { workspace = true }
 tokio = { version = "1", features = ["rt", "macros", "signal", "sync", "time"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+[features]
+default = ["otlp"]
+# Export spans over OTLP when the OTEL_* environment asks. Only `run` installs
+# it; an embedder calling `build` can turn the feature off and drop the
+# exporter's dependencies.
+otlp = ["resonate-trace/otlp"]
 
 [dev-dependencies]
 serde_json = { workspace = true }
