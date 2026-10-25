@@ -1,0 +1,54 @@
+{
+  "run_id": "resonate-tidb-aws-eu-central-1-burst-1792881005",
+  "system": "resonate",
+  "backend": "tidb-aws-eu-central-1",
+  "workload": "burst",
+  "params": {
+    "concurrency": 50,
+    "n": 50,
+    "wake": "push"
+  },
+  "started": 50,
+  "completed": 0,
+  "failed": 50,
+  "retries": 0,
+  "wall_s": 0.183056114,
+  "throughput_wf_s": 0.0,
+  "latency": {
+    "n": 0,
+    "mean_ms": 0.0,
+    "p50_ms": 0.0,
+    "p95_ms": 0.0,
+    "p99_ms": 0.0,
+    "max_ms": 0.0
+  },
+  "steps": {},
+  "sleep_lateness": null,
+  "requests": {
+    "task.create": {
+      "n": 50,
+      "mean_ms": 99.92853128,
+      "p50_ms": 93.096668,
+      "p95_ms": 172.822396,
+      "p99_ms": 182.239757,
+      "max_ms": 182.239757
+    }
+  },
+  "request_errors": 50,
+  "errors": {
+    "task.create 500: Internal error: Storage error: error communicating with databas": 50
+  },
+  "resources": [
+    {
+      "target": "pid:25945",
+      "cpu_avg_pct": 0.0,
+      "cpu_max_pct": 0.0,
+      "rss_avg_mb": 0.0,
+      "rss_max_mb": 0.0,
+      "samples": 0
+    }
+  ],
+  "notes": [
+    "server on this laptop; store TiDB Cloud Starter aws-eu-central-1 over WAN (TLS); pool 32"
+  ]
+}

@@ -1,0 +1,102 @@
+{
+  "run_id": "resonate-postgres-fanout-1792879054",
+  "system": "resonate",
+  "backend": "postgres",
+  "workload": "fanout",
+  "params": {
+    "concurrency": 20,
+    "k": 8,
+    "n": 500,
+    "wake": "push"
+  },
+  "started": 500,
+  "completed": 500,
+  "failed": 0,
+  "retries": 0,
+  "wall_s": 26.365027301,
+  "throughput_wf_s": 18.964516679299454,
+  "latency": {
+    "n": 500,
+    "mean_ms": 1042.8085823860001,
+    "p50_ms": 669.033046,
+    "p95_ms": 2302.917471,
+    "p99_ms": 5115.14616,
+    "max_ms": 5294.245758
+  },
+  "steps": {
+    "activity": {
+      "n": 4000,
+      "mean_ms": 553.55178200375,
+      "p50_ms": 328.195769,
+      "p95_ms": 1436.81382,
+      "p99_ms": 3468.348279,
+      "max_ms": 4192.016813
+    }
+  },
+  "sleep_lateness": null,
+  "requests": {
+    "task.create": {
+      "n": 500,
+      "mean_ms": 191.738445088,
+      "p50_ms": 121.224989,
+      "p95_ms": 523.931464,
+      "p99_ms": 1401.46108,
+      "max_ms": 1962.682065
+    },
+    "task.fence(promise.create)": {
+      "n": 4000,
+      "mean_ms": 309.119256134,
+      "p50_ms": 175.771846,
+      "p95_ms": 1034.886551,
+      "p99_ms": 2102.612111,
+      "max_ms": 3377.901616
+    },
+    "task.fence(promise.settle)": {
+      "n": 4000,
+      "mean_ms": 244.2989920075,
+      "p50_ms": 145.498769,
+      "p95_ms": 738.987396,
+      "p99_ms": 1790.178055,
+      "max_ms": 2900.373261
+    },
+    "task.fulfill": {
+      "n": 500,
+      "mean_ms": 189.80645928799999,
+      "p50_ms": 119.562634,
+      "p95_ms": 588.650991,
+      "p99_ms": 1348.611076,
+      "max_ms": 1905.454504
+    }
+  },
+  "request_errors": 0,
+  "errors": {},
+  "resources": [
+    {
+      "target": "pid:4140279",
+      "cpu_avg_pct": 31.61253394915107,
+      "cpu_max_pct": 75.12414183948823,
+      "rss_avg_mb": 54.470052083333336,
+      "rss_max_mb": 59.67578125,
+      "samples": 27
+    },
+    {
+      "target": "container:rbench-pg",
+      "cpu_avg_pct": 89.37788223160224,
+      "cpu_max_pct": 203.1845920622484,
+      "rss_avg_mb": 265.0436921296296,
+      "rss_max_mb": 281.59765625,
+      "samples": 27
+    },
+    {
+      "target": "proc:rbench",
+      "cpu_avg_pct": 10.647538993074212,
+      "cpu_max_pct": 45.77211769897669,
+      "rss_avg_mb": 62.85257523148148,
+      "rss_max_mb": 76.97265625,
+      "samples": 27
+    }
+  ],
+  "notes": [
+    "Postgres 17.10 in podman (rbench-pg), data on ext4 (/mnt/Projects), pool 32"
+  ]
+}

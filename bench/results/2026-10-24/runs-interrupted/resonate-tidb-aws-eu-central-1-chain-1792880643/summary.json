@@ -1,0 +1,133 @@
+{
+  "run_id": "resonate-tidb-aws-eu-central-1-chain-1792880643",
+  "system": "resonate",
+  "backend": "tidb-aws-eu-central-1",
+  "workload": "chain",
+  "params": {
+    "concurrency": 10,
+    "l": 5,
+    "n": 20,
+    "sleep_ms": 1000,
+    "wake": "push"
+  },
+  "started": 20,
+  "completed": 10,
+  "failed": 10,
+  "retries": 10,
+  "wall_s": 360.913204516,
+  "throughput_wf_s": 0.027707492756909313,
+  "latency": {
+    "n": 10,
+    "mean_ms": 157786.0461189,
+    "p50_ms": 158050.117683,
+    "p95_ms": 168879.781727,
+    "p99_ms": 168879.781727,
+    "max_ms": 168879.781727
+  },
+  "steps": {
+    "activity": {
+      "n": 84,
+      "mean_ms": 13025.196373666666,
+      "p50_ms": 11161.193171,
+      "p95_ms": 20833.439612,
+      "p99_ms": 28911.038708,
+      "max_ms": 29972.17196
+    },
+    "sleep": {
+      "n": 80,
+      "mean_ms": 17412.7591461875,
+      "p50_ms": 16898.262029,
+      "p95_ms": 31092.302784,
+      "p99_ms": 33210.670212,
+      "max_ms": 33798.603303
+    }
+  },
+  "sleep_lateness": {
+    "n": 80,
+    "mean_ms": 16413.24134405,
+    "p50_ms": 15898.688394,
+    "p95_ms": 30093.137794,
+    "p99_ms": 32211.442968,
+    "max_ms": 32799.066317
+  },
+  "requests": {
+    "task.create": {
+      "n": 20,
+      "mean_ms": 4450.9898439,
+      "p50_ms": 4575.131008,
+      "p95_ms": 5471.497591,
+      "p99_ms": 6026.019002,
+      "max_ms": 6026.019002
+    },
+    "task.fence(promise.create)": {
+      "n": 91,
+      "mean_ms": 5898.848701043956,
+      "p50_ms": 4725.963676,
+      "p95_ms": 8939.085776,
+      "p99_ms": 12254.334606,
+      "max_ms": 60001.216202
+    },
+    "task.fence(promise.settle)": {
+      "n": 94,
+      "mean_ms": 11462.690771436171,
+      "p50_ms": 6963.75814,
+      "p95_ms": 30652.532102,
+      "p99_ms": 60001.438576,
+      "max_ms": 60464.600502
+    },
+    "task.fence(timer)": {
+      "n": 85,
+      "mean_ms": 5610.123170517647,
+      "p50_ms": 4228.029662,
+      "p95_ms": 9222.377336,
+      "p99_ms": 30003.245924,
+      "max_ms": 60000.672013
+    },
+    "task.fulfill": {
+      "n": 10,
+      "mean_ms": 5998.146672399999,
+      "p50_ms": 5938.387353,
+      "p95_ms": 6758.967667,
+      "p99_ms": 6758.967667,
+      "max_ms": 6758.967667
+    },
+    "task.heartbeat": {
+      "n": 106,
+      "mean_ms": 9720.698466924528,
+      "p50_ms": 7810.491153,
+      "p95_ms": 30013.593038,
+      "p99_ms": 31030.66074,
+      "max_ms": 31313.401116
+    },
+    "task.suspend": {
+      "n": 86,
+      "mean_ms": 14742.552436046512,
+      "p50_ms": 13493.508383,
+      "p95_ms": 30003.392305,
+      "p99_ms": 60001.964618,
+      "max_ms": 60002.390487
+    }
+  },
+  "request_errors": 37,
+  "errors": {
+    "fence create 500: Internal error: Storage error: error communicating with databa": 1,
+    "fence settle 500: Internal error: Storage error: error communicating with databa": 1,
+    "fence settle 500: Internal error: Storage error: pool timed out while waiting fo": 4,
+    "task.suspend 500: Internal error: Storage error: error communicating with databa": 1,
+    "task.suspend 500: Internal error: Storage error: pool timed out while waiting fo": 2,
+    "timer create 500: Internal error: Storage error: pool timed out while waiting fo": 1
+  },
+  "resources": [
+    {
+      "target": "pid:25945",
+      "cpu_avg_pct": 0.37943644853396774,
+      "cpu_max_pct": 1.999869520513004,
+      "rss_avg_mb": 16.757011772853186,
+      "rss_max_mb": 20.1875,
+      "samples": 361
+    }
+  ],
+  "notes": [
+    "server on this laptop; store TiDB Cloud Starter aws-eu-central-1 over WAN (TLS); pool 32"
+  ]
+}

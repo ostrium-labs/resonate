@@ -20,6 +20,8 @@ import compression.zstd as zstd
 KEEP = (
     ("rbench-resonate", "resonate"),
     ("resonate-server", "resonate"),
+    ("resonate-server-tidb", "resonate-tidbcloud"),
+    ("rbench-resonate-tidb", "resonate-tidbcloud"),
     ("rbench-loams-durable", "loams-durable"),
     ("loams-engine", "loams-durable"),
     ("rbench-temporal", "temporal"),

@@ -1,0 +1,98 @@
+{
+  "run_id": "resonate-tidb-aws-ap-southeast-1-fanout-1792860222",
+  "system": "resonate",
+  "backend": "tidb-aws-ap-southeast-1",
+  "workload": "fanout",
+  "params": {
+    "concurrency": 4,
+    "k": 8,
+    "n": 40,
+    "wake": "push"
+  },
+  "started": 40,
+  "completed": 33,
+  "failed": 7,
+  "retries": 26,
+  "wall_s": 676.077058613,
+  "throughput_wf_s": 0.04881100398185506,
+  "latency": {
+    "n": 33,
+    "mean_ms": 52869.60732948485,
+    "p50_ms": 50938.208499,
+    "p95_ms": 82328.38893,
+    "p99_ms": 89081.875915,
+    "max_ms": 89081.875915
+  },
+  "steps": {
+    "activity": {
+      "n": 309,
+      "mean_ms": 39171.43715912298,
+      "p50_ms": 30723.351477,
+      "p95_ms": 115121.589925,
+      "p99_ms": 145837.092289,
+      "max_ms": 158720.335818
+    }
+  },
+  "sleep_lateness": null,
+  "requests": {
+    "task.create": {
+      "n": 40,
+      "mean_ms": 5594.16074425,
+      "p50_ms": 3662.46397,
+      "p95_ms": 15987.533957,
+      "p99_ms": 27848.215181,
+      "max_ms": 27848.215181
+    },
+    "task.fence(promise.create)": {
+      "n": 327,
+      "mean_ms": 13432.567122972478,
+      "p50_ms": 9010.86074,
+      "p95_ms": 50283.390178,
+      "p99_ms": 60001.55134,
+      "max_ms": 60001.684025
+    },
+    "task.fence(promise.settle)": {
+      "n": 335,
+      "mean_ms": 26503.782779853733,
+      "p50_ms": 21715.321856,
+      "p95_ms": 60000.93455,
+      "p99_ms": 60001.562799,
+      "max_ms": 60001.896796
+    },
+    "task.fulfill": {
+      "n": 36,
+      "mean_ms": 4719.434214722222,
+      "p50_ms": 4113.474733,
+      "p95_ms": 7576.105243,
+      "p99_ms": 8769.854489,
+      "max_ms": 8769.854489
+    },
+    "task.heartbeat": {
+      "n": 48,
+      "mean_ms": 26080.11196014583,
+      "p50_ms": 23409.172623,
+      "p95_ms": 50924.965269,
+      "p99_ms": 58662.89387,
+      "max_ms": 58662.89387
+    }
+  },
+  "request_errors": 40,
+  "errors": {
+    "fence create 409: Version mismatch": 1,
+    "fence settle 409: Version mismatch": 3,
+    "task.fulfill 409: Task version mismatch or invalid state": 3
+  },
+  "resources": [
+    {
+      "target": "pid:2576942",
+      "cpu_avg_pct": 0.31933865223653185,
+      "cpu_max_pct": 1.9998269129808546,
+      "rss_avg_mb": 14.783827200443787,
+      "rss_max_mb": 17.74609375,
+      "samples": 676
+    }
+  ],
+  "notes": [
+    "server on this laptop; store TiDB Cloud Starter aws-ap-southeast-1 over WAN (TLS); pool 32"
+  ]
+}

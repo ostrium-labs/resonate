@@ -1,0 +1,142 @@
+{
+  "run_id": "resonate-postgres-chain-1792879084",
+  "system": "resonate",
+  "backend": "postgres",
+  "workload": "chain",
+  "params": {
+    "concurrency": 20,
+    "l": 5,
+    "n": 100,
+    "sleep_ms": 1000,
+    "wake": "push"
+  },
+  "started": 100,
+  "completed": 100,
+  "failed": 0,
+  "retries": 0,
+  "wall_s": 73.014257668,
+  "throughput_wf_s": 1.369595517285209,
+  "latency": {
+    "n": 100,
+    "mean_ms": 9820.66047639,
+    "p50_ms": 7323.433251,
+    "p95_ms": 18035.976023,
+    "p99_ms": 18883.643886,
+    "max_ms": 45205.13361
+  },
+  "steps": {
+    "activity": {
+      "n": 500,
+      "mean_ms": 147.12932633399998,
+      "p50_ms": 72.294497,
+      "p95_ms": 556.293409,
+      "p99_ms": 1356.228634,
+      "max_ms": 1644.470769
+    },
+    "sleep": {
+      "n": 500,
+      "mean_ms": 1797.9275108919999,
+      "p50_ms": 1357.461843,
+      "p95_ms": 4838.418268,
+      "p99_ms": 8163.917729,
+      "max_ms": 31167.764642
+    }
+  },
+  "sleep_lateness": {
+    "n": 500,
+    "mean_ms": 798.437105126,
+    "p50_ms": 357.840536,
+    "p95_ms": 3838.486241,
+    "p99_ms": 7164.266168,
+    "max_ms": 30168.435412
+  },
+  "requests": {
+    "task.acquire": {
+      "n": 500,
+      "mean_ms": 71.047882706,
+      "p50_ms": 32.177641,
+      "p95_ms": 304.521791,
+      "p99_ms": 734.030434,
+      "max_ms": 935.524366
+    },
+    "task.create": {
+      "n": 100,
+      "mean_ms": 41.31723899,
+      "p50_ms": 26.200156,
+      "p95_ms": 105.911554,
+      "p99_ms": 168.513404,
+      "max_ms": 370.03825
+    },
+    "task.fence(promise.create)": {
+      "n": 500,
+      "mean_ms": 72.194131426,
+      "p50_ms": 31.498989,
+      "p95_ms": 311.073339,
+      "p99_ms": 734.752402,
+      "max_ms": 856.248584
+    },
+    "task.fence(promise.settle)": {
+      "n": 500,
+      "mean_ms": 74.80486807,
+      "p50_ms": 33.538577,
+      "p95_ms": 275.07758,
+      "p99_ms": 734.871877,
+      "max_ms": 807.845876
+    },
+    "task.fence(timer)": {
+      "n": 500,
+      "mean_ms": 69.44625007799999,
+      "p50_ms": 30.075711,
+      "p95_ms": 265.838536,
+      "p99_ms": 806.241657,
+      "max_ms": 973.879596
+    },
+    "task.fulfill": {
+      "n": 100,
+      "mean_ms": 53.5076019,
+      "p50_ms": 33.648482,
+      "p95_ms": 158.821465,
+      "p99_ms": 369.732285,
+      "max_ms": 385.796622
+    },
+    "task.suspend": {
+      "n": 500,
+      "mean_ms": 71.208956838,
+      "p50_ms": 31.500866,
+      "p95_ms": 307.290475,
+      "p99_ms": 734.311089,
+      "max_ms": 975.524976
+    }
+  },
+  "request_errors": 0,
+  "errors": {},
+  "resources": [
+    {
+      "target": "pid:4140279",
+      "cpu_avg_pct": 8.882917050856248,
+      "cpu_max_pct": 30.73550688638054,
+      "rss_avg_mb": 47.231003852739725,
+      "rss_max_mb": 60.7578125,
+      "samples": 73
+    },
+    {
+      "target": "container:rbench-pg",
+      "cpu_avg_pct": 23.525460818666197,
+      "cpu_max_pct": 76.97915338765871,
+      "rss_avg_mb": 299.7824272260274,
+      "rss_max_mb": 327.78515625,
+      "samples": 73
+    },
+    {
+      "target": "proc:rbench",
+      "cpu_avg_pct": 2.2195260998512962,
+      "cpu_max_pct": 17.911381790743174,
+      "rss_avg_mb": 49.6412136130137,
+      "rss_max_mb": 95.3203125,
+      "samples": 73
+    }
+  ],
+  "notes": [
+    "Postgres 17.10 in podman (rbench-pg), data on ext4 (/mnt/Projects), pool 32"
+  ]
+}

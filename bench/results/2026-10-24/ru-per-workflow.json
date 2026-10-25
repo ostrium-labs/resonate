@@ -1,0 +1,37 @@
+{
+    "starter_scaling": {
+        "read": 1.5,
+        "write": 2.26,
+        "why": "per-statement RU from @@tidb_last_query_info, 20 of each, local TiDB v8.5.8 vs Starter aws-us-west-2 (2026-10-25): INSERT 2.90 vs 6.73, autocommit UPDATE 3.28 vs 7.23, SELECT FOR UPDATE 1.70 vs 2.55, point get 0.52 vs 0.50; bench-data ru-spot-*.txt"
+    },
+    "method": "Resonate server (MySQL plugin) on a local TiDB v8.5.8 (ghcr.io/ostrium-labs/tidb:v8.5.8-loams.1, keyspace mode) over one PD + one TiKV v8.5.8; RU = sum over statements_summary(+history) of EXEC_COUNT*(AVG_REQUEST_UNIT_READ+AVG_REQUEST_UNIT_WRITE) for schema resonate, before/after each workload; bytes = sum(DATA_LENGTH+INDEX_LENGTH) after ANALYZE, delta per workload divided by its workflows",
+    "workloads": {
+        "fanout": {
+            "workflows": 100,
+            "ru_read_per_wf_local": 137.61003704378314,
+            "ru_write_per_wf_local": 234.96635937499636,
+            "ru_per_wf_local": 372.5763964187795,
+            "ru_per_wf": 737.4390277531664,
+            "bytes_total_after": 364410,
+            "bytes_per_wf": 3644.1
+        },
+        "chain": {
+            "workflows": 20,
+            "ru_read_per_wf_local": 234.19315166715586,
+            "ru_write_per_wf_local": 536.4638671874834,
+            "ru_per_wf_local": 770.6570188546393,
+            "ru_per_wf": 1563.6980673444461,
+            "bytes_total_after": 451500,
+            "bytes_per_wf": 4354.5
+        },
+        "burst": {
+            "workflows": 100,
+            "ru_read_per_wf_local": 23.616498420833196,
+            "ru_write_per_wf_local": 50.91191406249738,
+            "ru_per_wf_local": 74.52841248333058,
+            "ru_per_wf": 150.48567341249387,
+            "bytes_total_after": 534960,
+            "bytes_per_wf": 834.6
+        }
+    }
+}

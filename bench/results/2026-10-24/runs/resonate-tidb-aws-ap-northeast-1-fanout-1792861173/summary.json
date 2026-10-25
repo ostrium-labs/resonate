@@ -1,0 +1,97 @@
+{
+  "run_id": "resonate-tidb-aws-ap-northeast-1-fanout-1792861173",
+  "system": "resonate",
+  "backend": "tidb-aws-ap-northeast-1",
+  "workload": "fanout",
+  "params": {
+    "concurrency": 4,
+    "k": 8,
+    "n": 40,
+    "wake": "push"
+  },
+  "started": 40,
+  "completed": 31,
+  "failed": 9,
+  "retries": 91,
+  "wall_s": 1050.878449685,
+  "throughput_wf_s": 0.02949912999861423,
+  "latency": {
+    "n": 31,
+    "mean_ms": 98430.93257719354,
+    "p50_ms": 80965.678961,
+    "p95_ms": 223642.951002,
+    "p99_ms": 237038.182241,
+    "max_ms": 237038.182241
+  },
+  "steps": {
+    "activity": {
+      "n": 308,
+      "mean_ms": 65348.3064849513,
+      "p50_ms": 49765.812477,
+      "p95_ms": 177966.098851,
+      "p99_ms": 205833.833611,
+      "max_ms": 223536.983073
+    }
+  },
+  "sleep_lateness": null,
+  "requests": {
+    "task.create": {
+      "n": 40,
+      "mean_ms": 6436.4188899499995,
+      "p50_ms": 5410.023826,
+      "p95_ms": 18282.096385,
+      "p99_ms": 20787.569175,
+      "max_ms": 20787.569175
+    },
+    "task.fence(promise.create)": {
+      "n": 345,
+      "mean_ms": 20241.93175148406,
+      "p50_ms": 14555.928588,
+      "p95_ms": 60001.072732,
+      "p99_ms": 60002.181159,
+      "max_ms": 60003.014132
+    },
+    "task.fence(promise.settle)": {
+      "n": 384,
+      "mean_ms": 38742.69514278385,
+      "p50_ms": 37477.422071,
+      "p95_ms": 60001.434741,
+      "p99_ms": 60001.761473,
+      "max_ms": 60002.047063
+    },
+    "task.fulfill": {
+      "n": 36,
+      "mean_ms": 7588.344794861111,
+      "p50_ms": 6777.787855,
+      "p95_ms": 11673.366702,
+      "p99_ms": 20800.012752,
+      "max_ms": 20800.012752
+    },
+    "task.heartbeat": {
+      "n": 58,
+      "mean_ms": 39800.36792496552,
+      "p50_ms": 38153.912942,
+      "p95_ms": 60018.234028,
+      "p99_ms": 60027.509007,
+      "max_ms": 60257.629699
+    }
+  },
+  "request_errors": 119,
+  "errors": {
+    "fence settle 409: Version mismatch": 4,
+    "task.fulfill 409: Task version mismatch or invalid state": 5
+  },
+  "resources": [
+    {
+      "target": "pid:2681676",
+      "cpu_avg_pct": 0.22659830401291584,
+      "cpu_max_pct": 1.9998405807082686,
+      "rss_avg_mb": 15.145323660714286,
+      "rss_max_mb": 19.53125,
+      "samples": 1050
+    }
+  ],
+  "notes": [
+    "server on this laptop; store TiDB Cloud Starter aws-ap-northeast-1 over WAN (TLS); pool 32"
+  ]
+}

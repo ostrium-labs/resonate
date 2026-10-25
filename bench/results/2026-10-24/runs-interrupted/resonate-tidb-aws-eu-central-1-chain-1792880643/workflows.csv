@@ -1,0 +1,21 @@
+wf_id,start_ns,end_ns,latency_ms,ok,retries,error
+resonate-tidb-aws-eu-central-1-chain-1792880643-6,1792880643776256320,1792880792970737378,149194.481,true,0,
+resonate-tidb-aws-eu-central-1-chain-1792880643-8,1792880643798219829,1792880793184194286,149385.974,true,0,
+resonate-tidb-aws-eu-central-1-chain-1792880643-2,1792880643732231262,1792880796249628966,152517.398,true,0,
+resonate-tidb-aws-eu-central-1-chain-1792880643-9,1792880643809477501,1792880800911639740,157102.162,true,0,
+resonate-tidb-aws-eu-central-1-chain-1792880643-1,1792880643720996108,1792880801771113791,158050.118,true,0,
+resonate-tidb-aws-eu-central-1-chain-1792880643-5,1792880643764633528,1792880801801370727,158036.737,true,0,
+resonate-tidb-aws-eu-central-1-chain-1792880643-4,1792880643754067941,1792880802177918596,158423.851,true,0,
+resonate-tidb-aws-eu-central-1-chain-1792880643-7,1792880643786800729,1792880806675686029,162888.885,true,0,
+resonate-tidb-aws-eu-central-1-chain-1792880643-0,1792880643710446798,1792880807091519965,163381.073,true,0,
+resonate-tidb-aws-eu-central-1-chain-1792880643-3,1792880643742607564,1792880812622389291,168879.782,true,0,
+resonate-tidb-aws-eu-central-1-chain-1792880643-12,1792880796249652605,1792880976357967777,180108.315,false,1,task.suspend 500: Internal error: Storage error: error communicating with database: failed to lookup address information: Temporary failure in name resolution
+resonate-tidb-aws-eu-central-1-chain-1792880643-17,1792880806675738435,1792880976388558620,169712.820,false,1,fence settle 500: Internal error: Storage error: error communicating with database: failed to lookup address information: Temporary failure in name resolution
+resonate-tidb-aws-eu-central-1-chain-1792880643-19,1792880812622437146,1792880977089340673,164466.904,false,1,fence create 500: Internal error: Storage error: error communicating with database: failed to lookup address information: Temporary failure in name resolution
+resonate-tidb-aws-eu-central-1-chain-1792880643-14,1792880801771158721,1792881000391232880,198620.074,false,1,fence settle 500: Internal error: Storage error: pool timed out while waiting for an open connection
+resonate-tidb-aws-eu-central-1-chain-1792880643-15,1792880801801420079,1792881001236934283,199435.514,false,1,fence settle 500: Internal error: Storage error: pool timed out while waiting for an open connection
+resonate-tidb-aws-eu-central-1-chain-1792880643-11,1792880793560524036,1792881001256964440,207696.440,false,1,task.suspend 500: Internal error: Storage error: pool timed out while waiting for an open connection
+resonate-tidb-aws-eu-central-1-chain-1792880643-16,1792880802177971772,1792881001656085315,199478.114,false,1,fence settle 500: Internal error: Storage error: pool timed out while waiting for an open connection
+resonate-tidb-aws-eu-central-1-chain-1792880643-18,1792880807091564921,1792881004099600644,197008.036,false,1,fence settle 500: Internal error: Storage error: pool timed out while waiting for an open connection
+resonate-tidb-aws-eu-central-1-chain-1792880643-13,1792880800911703661,1792881004621560219,203709.857,false,1,timer create 500: Internal error: Storage error: pool timed out while waiting for an open connection
+resonate-tidb-aws-eu-central-1-chain-1792880643-10,1792880793560524014,1792881004623651314,211063.127,false,1,task.suspend 500: Internal error: Storage error: pool timed out while waiting for an open connection

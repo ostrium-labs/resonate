@@ -1,0 +1,100 @@
+[
+  {
+    "name": "signoz-service-map",
+    "path": "/service-map?relativeTime=6h",
+    "wait": 8000
+  },
+  {
+    "name": "signoz-services",
+    "path": "/services?relativeTime=6h",
+    "wait": 6000
+  },
+  {
+    "name": "trace-airflow-postgres-fanout-1792876931",
+    "path": "/trace/4da07f5afe419094014af9d3bd1b43b2",
+    "wait": 6000,
+    "trace_id": "4da07f5afe419094014af9d3bd1b43b2",
+    "duration_ms": 25984.945294,
+    "run": "airflow-postgres-fanout-1792876931"
+  },
+  {
+    "name": "trace-loams-durable-tikv-chain-1792876605",
+    "path": "/trace/56e08dd2a7c3657effe60b2726fa86a0",
+    "wait": 6000,
+    "trace_id": "56e08dd2a7c3657effe60b2726fa86a0",
+    "duration_ms": 7222.036296,
+    "run": "loams-durable-tikv-chain-1792876605"
+  },
+  {
+    "name": "trace-resonate-postgres-chain-1792879084",
+    "path": "/trace/584c2b6fb6beaba376981980b35d955f",
+    "wait": 6000,
+    "trace_id": "584c2b6fb6beaba376981980b35d955f",
+    "duration_ms": 7213.135062,
+    "run": "resonate-postgres-chain-1792879084"
+  },
+  {
+    "name": "trace-resonate-sqlite-fanout-1792876507",
+    "path": "/trace/5d7cdbc4100a6f4de10d3c29aae57a76",
+    "wait": 6000,
+    "trace_id": "5d7cdbc4100a6f4de10d3c29aae57a76",
+    "duration_ms": 309.671774,
+    "run": "resonate-sqlite-fanout-1792876507"
+  },
+  {
+    "name": "trace-resonate-tidb-aws-ap-southeast-1-chain-1792878945",
+    "path": "/trace/abe5e445c5ddb45bd3765186ea1ed289",
+    "wait": 6000,
+    "trace_id": "abe5e445c5ddb45bd3765186ea1ed289",
+    "duration_ms": 66792.254305,
+    "run": "resonate-tidb-aws-ap-southeast-1-chain-1792878945"
+  },
+  {
+    "name": "trace-resonate-tidb-aws-ap-southeast-1-fanout-1792878546",
+    "path": "/trace/91668578bb58147b3eb1675fcf9e068e",
+    "wait": 6000,
+    "trace_id": "91668578bb58147b3eb1675fcf9e068e",
+    "duration_ms": 35410.936181,
+    "run": "resonate-tidb-aws-ap-southeast-1-fanout-1792878546"
+  },
+  {
+    "name": "trace-resonate-tidb-aws-us-east-1-fanout-1792896380",
+    "path": "/trace/e76eb546b41cf3b62ad963cc817ceb0d",
+    "wait": 6000,
+    "trace_id": "e76eb546b41cf3b62ad963cc817ceb0d",
+    "duration_ms": 132101.447664,
+    "run": "resonate-tidb-aws-us-east-1-fanout-1792896380"
+  },
+  {
+    "name": "trace-resonate-tikv-chain-1792916950",
+    "path": "/trace/d0d99ccf9a209591105401bddec71eb6",
+    "wait": 6000,
+    "trace_id": "d0d99ccf9a209591105401bddec71eb6",
+    "duration_ms": 18975.917508,
+    "run": "resonate-tikv-chain-1792916950"
+  },
+  {
+    "name": "trace-resonate-tikv-fanout-1792880201",
+    "path": "/trace/e2cd7c10eec529ffea5f1baca2367f6f",
+    "wait": 6000,
+    "trace_id": "e2cd7c10eec529ffea5f1baca2367f6f",
+    "duration_ms": 147.034082,
+    "run": "resonate-tikv-fanout-1792880201"
+  },
+  {
+    "name": "trace-resonate-tikv-fanout-1792916938",
+    "path": "/trace/3679321ca7b9e68484e7bc6a3cfdfee1",
+    "wait": 6000,
+    "trace_id": "3679321ca7b9e68484e7bc6a3cfdfee1",
+    "duration_ms": 308.647388,
+    "run": "resonate-tikv-fanout-1792916938"
+  },
+  {
+    "name": "trace-temporal-postgres-fanout-1792876726",
+    "path": "/trace/c9fcd45a9e06af654859df43af7d5da9",
+    "wait": 6000,
+    "trace_id": "c9fcd45a9e06af654859df43af7d5da9",
+    "duration_ms": 1612.678952,
+    "run": "temporal-postgres-fanout-1792876726"
+  }
+]

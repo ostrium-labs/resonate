@@ -1,0 +1,84 @@
+{
+  "run_id": "temporal-postgres-chain-1792917519",
+  "system": "temporal",
+  "backend": "postgres",
+  "workload": "chain",
+  "params": {
+    "concurrency": 20,
+    "l": 5,
+    "n": 100,
+    "sleep_ms": 1000
+  },
+  "started": 100,
+  "completed": 100,
+  "failed": 0,
+  "retries": 0,
+  "wall_s": 51.522702897,
+  "throughput_wf_s": 1.9408919636827258,
+  "latency": {
+    "n": 100,
+    "mean_ms": 9480.2225294,
+    "p50_ms": 8805.908616,
+    "p95_ms": 13825.746967,
+    "p99_ms": 17982.967854,
+    "max_ms": 21474.338162
+  },
+  "steps": {
+    "activity": {
+      "n": 500,
+      "mean_ms": 114.679938298,
+      "p50_ms": 67.924133,
+      "p95_ms": 417.136894,
+      "p99_ms": 625.333471,
+      "max_ms": 891.753759
+    },
+    "sleep": {
+      "n": 500,
+      "mean_ms": 1416.8768579300001,
+      "p50_ms": 1260.180739,
+      "p95_ms": 2129.447211,
+      "p99_ms": 2659.554628,
+      "max_ms": 12737.168726
+    }
+  },
+  "sleep_lateness": {
+    "n": 500,
+    "mean_ms": 416.87685793,
+    "p50_ms": 260.180739,
+    "p95_ms": 1129.447211,
+    "p99_ms": 1659.554628,
+    "max_ms": 11737.168726
+  },
+  "requests": {},
+  "request_errors": 0,
+  "errors": {},
+  "resources": [
+    {
+      "target": "container:rbench-temporal-server",
+      "cpu_avg_pct": 25.939192014856133,
+      "cpu_max_pct": 52.573940513779704,
+      "rss_avg_mb": 302.465150122549,
+      "rss_max_mb": 318.8828125,
+      "samples": 51
+    },
+    {
+      "target": "container:rbench-temporal-postgres",
+      "cpu_avg_pct": 15.483404172791639,
+      "cpu_max_pct": 29.899877781403283,
+      "rss_avg_mb": 175.98782169117646,
+      "rss_max_mb": 203.9765625,
+      "samples": 51
+    },
+    {
+      "target": "pid:710582",
+      "cpu_avg_pct": 4.565929871038962,
+      "cpu_max_pct": 7.998802803186841,
+      "rss_avg_mb": 51.943704044117645,
+      "rss_max_mb": 63.1171875,
+      "samples": 51
+    }
+  ],
+  "notes": [
+    "stock Temporal 1.32.1, four services in one container, Postgres 17.10 in podman, data on ext4 (/mnt/Projects); Go SDK 1.49.0 worker and starter in one process"
+  ]
+}

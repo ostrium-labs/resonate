@@ -1,0 +1,97 @@
+{
+  "run_id": "resonate-tidb-aws-sa-east-1-fanout-1792914237",
+  "system": "resonate",
+  "backend": "tidb-aws-sa-east-1",
+  "workload": "fanout",
+  "params": {
+    "concurrency": 4,
+    "k": 8,
+    "n": 40,
+    "wake": "push"
+  },
+  "started": 40,
+  "completed": 31,
+  "failed": 9,
+  "retries": 10,
+  "wall_s": 876.88674057,
+  "throughput_wf_s": 0.0353523420594194,
+  "latency": {
+    "n": 31,
+    "mean_ms": 87986.30085509676,
+    "p50_ms": 84093.052863,
+    "p95_ms": 134240.963666,
+    "p99_ms": 134876.955755,
+    "max_ms": 134876.955755
+  },
+  "steps": {
+    "activity": {
+      "n": 316,
+      "mean_ms": 52121.892268781645,
+      "p50_ms": 50790.125338,
+      "p95_ms": 80464.95868,
+      "p99_ms": 109572.035384,
+      "max_ms": 119108.109192
+    }
+  },
+  "sleep_lateness": null,
+  "requests": {
+    "task.create": {
+      "n": 40,
+      "mean_ms": 5418.3387946,
+      "p50_ms": 5005.647294,
+      "p95_ms": 8120.965458,
+      "p99_ms": 12195.331998,
+      "max_ms": 12195.331998
+    },
+    "task.fence(promise.create)": {
+      "n": 320,
+      "mean_ms": 14603.781790690624,
+      "p50_ms": 14233.616745,
+      "p95_ms": 27410.658889,
+      "p99_ms": 41533.217633,
+      "max_ms": 46465.13188
+    },
+    "task.fence(promise.settle)": {
+      "n": 330,
+      "mean_ms": 37045.74542623333,
+      "p50_ms": 36537.538887,
+      "p95_ms": 58579.178927,
+      "p99_ms": 60001.319535,
+      "max_ms": 60010.331793
+    },
+    "task.fulfill": {
+      "n": 39,
+      "mean_ms": 7011.533390974359,
+      "p50_ms": 6967.943703,
+      "p95_ms": 9516.323138,
+      "p99_ms": 11050.823668,
+      "max_ms": 11050.823668
+    },
+    "task.heartbeat": {
+      "n": 45,
+      "mean_ms": 40251.56928691111,
+      "p50_ms": 41428.494272,
+      "p95_ms": 51620.277223,
+      "p99_ms": 60000.420974,
+      "max_ms": 60000.420974
+    }
+  },
+  "request_errors": 23,
+  "errors": {
+    "fence settle 409: Version mismatch": 1,
+    "task.fulfill 409: Task version mismatch or invalid state": 8
+  },
+  "resources": [
+    {
+      "target": "pid:450506",
+      "cpu_avg_pct": 0.32718269171949144,
+      "cpu_max_pct": 1.9998429483335813,
+      "rss_avg_mb": 19.33701015446224,
+      "rss_max_mb": 23.56640625,
+      "samples": 874
+    }
+  ],
+  "notes": [
+    "server on this laptop; store TiDB Cloud Starter aws-sa-east-1 over WAN (TLS); pool 32"
+  ]
+}

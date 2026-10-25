@@ -1,0 +1,85 @@
+{
+  "run_id": "resonate-tidb-aws-ap-northeast-1-burst-1792879924",
+  "system": "resonate",
+  "backend": "tidb-aws-ap-northeast-1",
+  "workload": "burst",
+  "params": {
+    "concurrency": 50,
+    "n": 50,
+    "wake": "push"
+  },
+  "started": 50,
+  "completed": 50,
+  "failed": 0,
+  "retries": 0,
+  "wall_s": 21.376579359,
+  "throughput_wf_s": 2.3390084615642177,
+  "latency": {
+    "n": 50,
+    "mean_ms": 18735.97768044,
+    "p50_ms": 19127.993416,
+    "p95_ms": 20758.996075,
+    "p99_ms": 21373.796091,
+    "max_ms": 21373.796091
+  },
+  "steps": {
+    "activity": {
+      "n": 50,
+      "mean_ms": 8971.68719086,
+      "p50_ms": 8402.151675,
+      "p95_ms": 10292.843569,
+      "p99_ms": 11840.993967,
+      "max_ms": 11840.993967
+    }
+  },
+  "sleep_lateness": null,
+  "requests": {
+    "task.create": {
+      "n": 50,
+      "mean_ms": 4039.5614289200003,
+      "p50_ms": 3353.100085,
+      "p95_ms": 5607.125021,
+      "p99_ms": 5608.833846,
+      "max_ms": 5608.833846
+    },
+    "task.fence(promise.create)": {
+      "n": 50,
+      "mean_ms": 3453.5635881,
+      "p50_ms": 3890.050932,
+      "p95_ms": 4512.494824,
+      "p99_ms": 4709.635749,
+      "max_ms": 4709.635749
+    },
+    "task.fence(promise.settle)": {
+      "n": 50,
+      "mean_ms": 5517.9526553000005,
+      "p50_ms": 5730.441597,
+      "p95_ms": 7544.852451,
+      "p99_ms": 7548.439991,
+      "max_ms": 7548.439991
+    },
+    "task.fulfill": {
+      "n": 50,
+      "mean_ms": 5724.5167542,
+      "p50_ms": 5740.225054,
+      "p95_ms": 7368.934641,
+      "p99_ms": 7572.841705,
+      "max_ms": 7572.841705
+    }
+  },
+  "request_errors": 0,
+  "errors": {},
+  "resources": [
+    {
+      "target": "pid:4156934",
+      "cpu_avg_pct": 1.6359273241995893,
+      "cpu_max_pct": 2.9997077564715333,
+      "rss_avg_mb": 24.222301136363637,
+      "rss_max_mb": 25.9375,
+      "samples": 22
+    }
+  ],
+  "notes": [
+    "server on this laptop; store TiDB Cloud Starter aws-ap-northeast-1 over WAN (TLS); pool 32"
+  ]
+}

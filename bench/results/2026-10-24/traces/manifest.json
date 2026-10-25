@@ -1,0 +1,16 @@
+{
+  "kept_spans": {
+    "airflow/airflow": 42930,
+    "airflow/rbench-airflow": 257464,
+    "loams-durable/rbench-loams-durable": 44409,
+    "resonate/rbench-resonate": 221700,
+    "resonate/resonate-server": 332307,
+    "resonate-tidbcloud/resonate-server-tidb": 45947,
+    "temporal/rbench-temporal": 39965,
+    "temporal/temporal-server.frontend": 110237,
+    "temporal/temporal-server.history": 248688,
+    "temporal/temporal-server.matching": 91420,
+    "temporal/temporal-server.worker": 980
+  },
+  "dropped_spans_other_services": 4694658
+}

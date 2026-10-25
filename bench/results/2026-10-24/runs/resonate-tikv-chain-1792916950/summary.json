@@ -1,0 +1,158 @@
+{
+  "run_id": "resonate-tikv-chain-1792916950",
+  "system": "resonate",
+  "backend": "tikv",
+  "workload": "chain",
+  "params": {
+    "concurrency": 20,
+    "l": 5,
+    "n": 100,
+    "sleep_ms": 1000,
+    "wake": "push"
+  },
+  "started": 100,
+  "completed": 100,
+  "failed": 0,
+  "retries": 0,
+  "wall_s": 124.235752379,
+  "throughput_wf_s": 0.8049212733459756,
+  "latency": {
+    "n": 100,
+    "mean_ms": 23232.64866762,
+    "p50_ms": 19362.918401,
+    "p95_ms": 47160.86748,
+    "p99_ms": 55753.060454,
+    "max_ms": 56567.06882
+  },
+  "steps": {
+    "activity": {
+      "n": 500,
+      "mean_ms": 132.30087888,
+      "p50_ms": 67.063148,
+      "p95_ms": 525.244446,
+      "p99_ms": 1003.141588,
+      "max_ms": 1323.721623
+    },
+    "sleep": {
+      "n": 500,
+      "mean_ms": 4468.856332804,
+      "p50_ms": 3540.599237,
+      "p95_ms": 9835.224327,
+      "p99_ms": 17270.154167,
+      "max_ms": 18083.785907
+    }
+  },
+  "sleep_lateness": {
+    "n": 500,
+    "mean_ms": 3469.35577873,
+    "p50_ms": 2541.069203,
+    "p95_ms": 8835.996931,
+    "p99_ms": 16271.133945,
+    "max_ms": 17084.502094
+  },
+  "requests": {
+    "task.acquire": {
+      "n": 488,
+      "mean_ms": 186.00399084631147,
+      "p50_ms": 94.111794,
+      "p95_ms": 664.9464,
+      "p99_ms": 1304.703989,
+      "max_ms": 1812.551159
+    },
+    "task.create": {
+      "n": 100,
+      "mean_ms": 133.67766867,
+      "p50_ms": 77.757006,
+      "p95_ms": 342.409217,
+      "p99_ms": 522.787197,
+      "max_ms": 716.73484
+    },
+    "task.fence(promise.create)": {
+      "n": 500,
+      "mean_ms": 72.68779413,
+      "p50_ms": 33.40396,
+      "p95_ms": 293.050928,
+      "p99_ms": 682.968921,
+      "max_ms": 938.453115
+    },
+    "task.fence(promise.settle)": {
+      "n": 500,
+      "mean_ms": 59.495827456,
+      "p50_ms": 30.011753,
+      "p95_ms": 190.953085,
+      "p99_ms": 475.473631,
+      "max_ms": 1052.246383
+    },
+    "task.fence(timer)": {
+      "n": 500,
+      "mean_ms": 193.806868282,
+      "p50_ms": 94.507348,
+      "p95_ms": 735.984784,
+      "p99_ms": 1411.703449,
+      "max_ms": 2164.163757
+    },
+    "task.fulfill": {
+      "n": 100,
+      "mean_ms": 92.7724152,
+      "p50_ms": 53.192238,
+      "p95_ms": 301.23961,
+      "p99_ms": 456.262756,
+      "max_ms": 715.111709
+    },
+    "task.heartbeat": {
+      "n": 4,
+      "mean_ms": 469.8324375,
+      "p50_ms": 598.352244,
+      "p95_ms": 629.573402,
+      "p99_ms": 629.573402,
+      "max_ms": 629.573402
+    },
+    "task.suspend": {
+      "n": 500,
+      "mean_ms": 79.23385285799999,
+      "p50_ms": 31.540792,
+      "p95_ms": 323.798692,
+      "p99_ms": 948.039236,
+      "max_ms": 1339.1527
+    }
+  },
+  "request_errors": 0,
+  "errors": {},
+  "resources": [
+    {
+      "target": "pid:694261",
+      "cpu_avg_pct": 9.569684078946706,
+      "cpu_max_pct": 30.877464234426498,
+      "rss_avg_mb": 48.13130040322581,
+      "rss_max_mb": 66.6484375,
+      "samples": 124
+    },
+    {
+      "target": "container:rbench-tikv-tikv",
+      "cpu_avg_pct": 8.083171897266952,
+      "cpu_max_pct": 24.514431538807674,
+      "rss_avg_mb": 665.2989226310484,
+      "rss_max_mb": 2537.875,
+      "samples": 124
+    },
+    {
+      "target": "container:rbench-tikv-pd",
+      "cpu_avg_pct": 5.6684030989029885,
+      "cpu_max_pct": 12.011438013520639,
+      "rss_avg_mb": 83.65413936491936,
+      "rss_max_mb": 107.48828125,
+      "samples": 124
+    },
+    {
+      "target": "proc:rbench",
+      "cpu_avg_pct": 1.197355386772468,
+      "cpu_max_pct": 17.936328473260595,
+      "rss_avg_mb": 26.984059979838708,
+      "rss_max_mb": 36.7421875,
+      "samples": 124
+    }
+  ],
+  "notes": [
+    "loams/main b5177606 (FW1 TiKV store merged, FW10 tracing), one PD + one TiKV v8.5.8 in podman, API v2 keyspace resonate_bench, data on ext4 (/mnt/Projects)"
+  ]
+}

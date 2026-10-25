@@ -36,16 +36,23 @@ for be, os_ in sorted(rtt.items()):
 text = text.replace("TIDB_SECTION", ("#### TiDB" + tidb).strip() + "\n\nRound trips:\n\n" + "\n".join(rows))
 
 # Timers: every chain run in the headline list.
-trows = ["| System | Backend | late p50 ms | late p95 ms | late p99 ms | max ms | run |", "|---|---|---:|---:|---:|---:|---|"]
+trows = ["| System | Backend | Run note | FW11 (SQL timer wheel) applies | late p50 ms | late p95 ms | late p99 ms | max ms | run |",
+         "|---|---|---|---|---:|---:|---:|---:|---|"]
 for line in open(os.path.join(d, "headline-runs.txt")):
-    run = line.split("#", 1)[0].strip()
+    if line.startswith("#"):
+        continue
+    run, _, note = line.partition("#")
+    run, note = run.strip(), note.strip()
     if not run or "-chain-" not in run:
         continue
     s = json.load(open(os.path.join(d, "runs", run, "summary.json")))
     l = s.get("sleep_lateness") or {}
     if not l:
         continue
-    trows.append(f"| {s['system']} | {s['backend']} | {l['p50_ms']:,.0f} | {l['p95_ms']:,.0f} | {l['p99_ms']:,.0f} | {l['max_ms']:,.0f} | {run} |")
+    sql = "yes" if s["system"] == "resonate" and (s["backend"] in ("sqlite", "postgres") or s["backend"].startswith("tidb")) else "no"
+    if s["backend"].startswith("tidb"):
+        note = (note + "; " if note else "") + "includes WAN round trips"
+    trows.append(f"| {s['system']} | {s['backend']} | {note} | {sql} | {l['p50_ms']:,.0f} | {l['p95_ms']:,.0f} | {l['p99_ms']:,.0f} | {l['max_ms']:,.0f} | {run} |")
 text = text.replace("TIMERS_TABLE", "\n".join(trows))
 
 cost = open(os.path.join(d, "cost.md")).read().strip()
@@ -74,9 +81,10 @@ laptop-like, unreplicated case. The Resonate server's own VM is the same in both
 TiKV is flat until it runs out of capacity. Break-even is the workflow count per month where Starter's RU bill
 equals the TiKV cluster's monthly price (storage left out on both sides: without the fork's retention, FW5, both
 grow with history — ~3.6 KiB per fan-out workflow, so 1 M retained fan-out workflows are ~3.4 GiB, inside Starter's
-5 GiB free row storage). The TiKV capacity column applies the request rate one laptop TiKV node sustained (2,178
-protocol requests/s) to each workload; a 3 × 2 vCPU cluster with replication factor 3 has not been measured and
-could be lower."""
+5 GiB free row storage). The TiKV capacity column applies the best request rate one laptop TiKV node sustained (2,178
+protocol requests/s, the WIP FW1 build in the quieter hour; the final build reached 870-890 requests/s with the host
+at load 26-40) to each workload; a 3 × 2 vCPU cluster with replication factor 3 has not been measured and could be
+lower. Either way the break-even points sit far below the capacity."""
 text = text.replace("COST_SECTION", cost_text)
 
 created = [l.rstrip("\n").split("\t") for l in open(os.path.join(state, "created.tsv")) if l.strip()]

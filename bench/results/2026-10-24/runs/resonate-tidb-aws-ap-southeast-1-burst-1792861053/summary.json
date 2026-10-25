@@ -1,0 +1,85 @@
+{
+  "run_id": "resonate-tidb-aws-ap-southeast-1-burst-1792861053",
+  "system": "resonate",
+  "backend": "tidb-aws-ap-southeast-1",
+  "workload": "burst",
+  "params": {
+    "concurrency": 50,
+    "n": 50,
+    "wake": "push"
+  },
+  "started": 50,
+  "completed": 50,
+  "failed": 0,
+  "retries": 0,
+  "wall_s": 29.277922301,
+  "throughput_wf_s": 1.7077714561149795,
+  "latency": {
+    "n": 50,
+    "mean_ms": 24106.23106218,
+    "p50_ms": 24817.924312,
+    "p95_ms": 28873.292802,
+    "p99_ms": 29276.657459,
+    "max_ms": 29276.657459
+  },
+  "steps": {
+    "activity": {
+      "n": 50,
+      "mean_ms": 11470.954815340001,
+      "p50_ms": 11358.012026,
+      "p95_ms": 14525.819108,
+      "p99_ms": 14737.242172,
+      "max_ms": 14737.242172
+    }
+  },
+  "sleep_lateness": null,
+  "requests": {
+    "task.create": {
+      "n": 50,
+      "mean_ms": 3458.1386555,
+      "p50_ms": 2241.668617,
+      "p95_ms": 5905.520709,
+      "p99_ms": 5905.831661,
+      "max_ms": 5905.831661
+    },
+    "task.fence(promise.create)": {
+      "n": 50,
+      "mean_ms": 5090.4255458,
+      "p50_ms": 5353.320318,
+      "p95_ms": 7118.008876,
+      "p99_ms": 7152.196251,
+      "max_ms": 7152.196251
+    },
+    "task.fence(promise.settle)": {
+      "n": 50,
+      "mean_ms": 6380.37586962,
+      "p50_ms": 6419.278142,
+      "p95_ms": 7669.532295,
+      "p99_ms": 7903.318502,
+      "max_ms": 7903.318502
+    },
+    "task.fulfill": {
+      "n": 50,
+      "mean_ms": 9176.970071799999,
+      "p50_ms": 9938.218467,
+      "p95_ms": 11233.103694,
+      "p99_ms": 11268.342509,
+      "max_ms": 11268.342509
+    }
+  },
+  "request_errors": 0,
+  "errors": {},
+  "resources": [
+    {
+      "target": "pid:2576942",
+      "cpu_avg_pct": 1.034351067805253,
+      "cpu_max_pct": 2.999697066592639,
+      "rss_avg_mb": 20.04943426724138,
+      "rss_max_mb": 22.34765625,
+      "samples": 29
+    }
+  ],
+  "notes": [
+    "server on this laptop; store TiDB Cloud Starter aws-ap-southeast-1 over WAN (TLS); pool 32"
+  ]
+}

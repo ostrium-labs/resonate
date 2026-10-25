@@ -1,0 +1,85 @@
+{
+  "run_id": "resonate-tidb-alicloud-ap-southeast-1-burst-1792868685",
+  "system": "resonate",
+  "backend": "tidb-alicloud-ap-southeast-1",
+  "workload": "burst",
+  "params": {
+    "concurrency": 50,
+    "n": 50,
+    "wake": "push"
+  },
+  "started": 50,
+  "completed": 50,
+  "failed": 0,
+  "retries": 0,
+  "wall_s": 19.319917644,
+  "throughput_wf_s": 2.5880027503910203,
+  "latency": {
+    "n": 50,
+    "mean_ms": 15992.647913280001,
+    "p50_ms": 16050.216555,
+    "p95_ms": 18704.298181,
+    "p99_ms": 19319.107794,
+    "max_ms": 19319.107794
+  },
+  "steps": {
+    "activity": {
+      "n": 50,
+      "mean_ms": 8329.75240462,
+      "p50_ms": 8402.299366,
+      "p95_ms": 9214.495693,
+      "p99_ms": 9828.742433,
+      "max_ms": 9828.742433
+    }
+  },
+  "sleep_lateness": null,
+  "requests": {
+    "task.create": {
+      "n": 50,
+      "mean_ms": 2801.96787474,
+      "p50_ms": 2331.844551,
+      "p95_ms": 4375.109382,
+      "p99_ms": 4375.318403,
+      "max_ms": 4375.318403
+    },
+    "task.fence(promise.create)": {
+      "n": 50,
+      "mean_ms": 3303.17309182,
+      "p50_ms": 3285.151385,
+      "p95_ms": 4303.120452,
+      "p99_ms": 4303.353648,
+      "max_ms": 4303.353648
+    },
+    "task.fence(promise.settle)": {
+      "n": 50,
+      "mean_ms": 5026.50207812,
+      "p50_ms": 5113.65074,
+      "p95_ms": 6251.916271,
+      "p99_ms": 6364.712495,
+      "max_ms": 6364.712495
+    },
+    "task.fulfill": {
+      "n": 50,
+      "mean_ms": 4860.79088964,
+      "p50_ms": 4909.018468,
+      "p95_ms": 5939.242724,
+      "p99_ms": 6142.889606,
+      "max_ms": 6142.889606
+    }
+  },
+  "request_errors": 0,
+  "errors": {},
+  "resources": [
+    {
+      "target": "pid:3337954",
+      "cpu_avg_pct": 1.1577568932750641,
+      "cpu_max_pct": 1.9998618035497895,
+      "rss_avg_mb": 20.146998355263158,
+      "rss_max_mb": 20.3671875,
+      "samples": 19
+    }
+  ],
+  "notes": [
+    "server on this laptop; store TiDB Cloud Starter alicloud-ap-southeast-1 over WAN (TLS); pool 32"
+  ]
+}

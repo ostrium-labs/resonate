@@ -1,0 +1,80 @@
+# Runs in the headline tables (bench/scripts/headline.py). Rows with a comment
+# are other runs of the same leg shown for context. Every run, including the
+# ones not listed, is in results.md and runs/.
+#
+# Table A: the raw Resonate stores on the final build (loams/main b5177606:
+# FW1 TiKV store, FW10 tracing on), run back to back 2026-10-25 08:14-08:31 UTC.
+# Table B: every system in the quieter hour, 2026-10-24/25 21:15-22:12 UTC
+# (Airflow: the 1 s polling pass, 2026-10-25 02:53-07:40 UTC).
+## A · fanout, raw Resonate stores back to back (500 workflows x 8 parallel steps, 20 in flight)
+resonate-tikv-fanout-1792916938
+resonate-tikv-fanout-1792916248   # same build, 6 min earlier
+resonate-tikv-fanout-1792916070   # same build, first load on a fresh TiKV
+resonate-tikv-fanout-1792916438   # same build, server tracing off
+resonate-postgres-fanout-1792916826
+resonate-sqlite-fanout-1792916650
+## A · chain, raw Resonate stores back to back (100 workflows x 5 steps + 1 s sleeps, 20 in flight)
+resonate-tikv-chain-1792916950
+resonate-tikv-chain-1792916260   # same build, 6 min earlier
+resonate-tikv-chain-1792916086   # same build, fresh TiKV
+resonate-tikv-chain-1792916456   # same build, server tracing off
+resonate-postgres-chain-1792916856
+resonate-sqlite-chain-1792916684
+## A · burst, raw Resonate stores back to back (500 one-step workflows at once)
+resonate-tikv-burst-1792917077
+resonate-tikv-burst-1792916349   # same build, 6 min earlier
+resonate-tikv-burst-1792916183   # same build, fresh TiKV
+resonate-tikv-burst-1792916545   # same build, server tracing off
+resonate-postgres-burst-1792916890
+resonate-sqlite-burst-1792916765
+## B · fanout, every system, quieter hour
+resonate-tikv-fanout-1792880201   # WIP FW1 4196c06c, warm cluster
+resonate-tikv-fanout-1792879851   # WIP FW1, fresh TiKV: region errors
+loams-durable-tikv-fanout-1792876595
+resonate-sqlite-fanout-1792876507
+resonate-postgres-fanout-1792879054
+temporal-postgres-fanout-1792876726
+airflow-postgres-fanout-1792897057   # polling each run every 1 s
+airflow-postgres-fanout-1792876931   # polling every 100 ms (earlier pass)
+## B · chain, every system, quieter hour
+resonate-tikv-chain-1792880206   # WIP FW1, warm
+resonate-tikv-chain-1792879987   # WIP FW1, fresh TiKV
+loams-durable-tikv-chain-1792876605
+resonate-sqlite-chain-1792876519
+resonate-postgres-chain-1792879084
+temporal-postgres-chain-1792876782
+airflow-postgres-chain-1792913275   # polling every 1 s
+airflow-postgres-chain-1792878109   # polling every 100 ms (earlier pass)
+## B · burst, every system, quieter hour
+resonate-tikv-burst-1792880271   # WIP FW1, warm
+resonate-tikv-burst-1792880103   # WIP FW1, fresh TiKV
+loams-durable-tikv-burst-1792876649
+resonate-sqlite-burst-1792876563
+resonate-postgres-burst-1792879159
+temporal-postgres-burst-1792876832
+airflow-postgres-burst-1792913572   # polling every 1 s
+airflow-postgres-burst-1792878403   # polling every 100 ms (earlier pass)
+## TiDB fanout: 40 workflows x 8 parallel steps, 4 in flight (server on the laptop, store over the WAN, traced FW10 build)
+resonate-tidb-aws-ap-southeast-1-fanout-1792878546
+resonate-tidb-aws-ap-northeast-1-fanout-1792879201
+resonate-tidb-aws-eu-central-1-fanout-1792895084
+resonate-tidb-aws-us-east-1-fanout-1792896380
+resonate-tidb-aws-us-west-2-fanout-1792913083
+resonate-tidb-aws-sa-east-1-fanout-1792914237
+resonate-tidb-alicloud-ap-southeast-1-fanout-1792915614
+## TiDB chain: 20 workflows x 5 steps + 1 s sleeps, 10 in flight
+resonate-tidb-aws-ap-southeast-1-chain-1792878945
+resonate-tidb-aws-ap-northeast-1-chain-1792879780
+resonate-tidb-aws-eu-central-1-chain-1792895930
+resonate-tidb-aws-us-east-1-chain-1792897772
+resonate-tidb-aws-us-west-2-chain-1792913854
+resonate-tidb-aws-sa-east-1-chain-1792915115
+resonate-tidb-alicloud-ap-southeast-1-chain-1792916270
+## TiDB burst: 50 one-step workflows at once
+resonate-tidb-aws-ap-southeast-1-burst-1792879087
+resonate-tidb-aws-ap-northeast-1-burst-1792879924
+resonate-tidb-aws-eu-central-1-burst-1792896144
+resonate-tidb-aws-us-east-1-burst-1792898250
+resonate-tidb-aws-us-west-2-burst-1792914105
+resonate-tidb-aws-sa-east-1-burst-1792915452
+resonate-tidb-alicloud-ap-southeast-1-burst-1792916424

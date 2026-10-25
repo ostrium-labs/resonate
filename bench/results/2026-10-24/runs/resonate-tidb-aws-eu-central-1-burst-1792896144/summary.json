@@ -1,0 +1,97 @@
+{
+  "run_id": "resonate-tidb-aws-eu-central-1-burst-1792896144",
+  "system": "resonate",
+  "backend": "tidb-aws-eu-central-1",
+  "workload": "burst",
+  "params": {
+    "concurrency": 50,
+    "n": 50,
+    "wake": "push"
+  },
+  "started": 50,
+  "completed": 18,
+  "failed": 32,
+  "retries": 0,
+  "wall_s": 131.757710391,
+  "throughput_wf_s": 0.13661439582233004,
+  "latency": {
+    "n": 18,
+    "mean_ms": 118753.583946,
+    "p50_ms": 121018.680101,
+    "p95_ms": 124092.671533,
+    "p99_ms": 124525.662238,
+    "max_ms": 124525.662238
+  },
+  "steps": {
+    "activity": {
+      "n": 43,
+      "mean_ms": 58088.930069093025,
+      "p50_ms": 59580.336082,
+      "p95_ms": 64283.441584,
+      "p99_ms": 65046.0037,
+      "max_ms": 65046.0037
+    }
+  },
+  "sleep_lateness": null,
+  "requests": {
+    "task.create": {
+      "n": 50,
+      "mean_ms": 25861.71013512,
+      "p50_ms": 25289.602362,
+      "p95_ms": 37372.16476,
+      "p99_ms": 37732.105624,
+      "max_ms": 37732.105624
+    },
+    "task.fence(promise.create)": {
+      "n": 50,
+      "mean_ms": 19230.75599084,
+      "p50_ms": 19748.223424,
+      "p95_ms": 22327.325084,
+      "p99_ms": 23854.977056,
+      "max_ms": 23854.977056
+    },
+    "task.fence(promise.settle)": {
+      "n": 50,
+      "mean_ms": 37412.192101019995,
+      "p50_ms": 38899.343356,
+      "p95_ms": 46037.955238,
+      "p99_ms": 46834.697299,
+      "max_ms": 46834.697299
+    },
+    "task.fulfill": {
+      "n": 43,
+      "mean_ms": 34778.20069011628,
+      "p50_ms": 34519.427219,
+      "p95_ms": 44326.931466,
+      "p99_ms": 50102.764928,
+      "max_ms": 50102.764928
+    },
+    "task.heartbeat": {
+      "n": 60,
+      "mean_ms": 24529.889499049998,
+      "p50_ms": 25185.069544,
+      "p95_ms": 39907.034437,
+      "p99_ms": 41397.374309,
+      "max_ms": 45013.243464
+    }
+  },
+  "request_errors": 43,
+  "errors": {
+    "fence settle 500: Internal error: Storage error: pool timed out while waiting fo": 7,
+    "task.fulfill 409: Task version mismatch or invalid state": 8,
+    "task.fulfill 500: Internal error: Storage error: pool timed out while waiting fo": 17
+  },
+  "resources": [
+    {
+      "target": "pid:695022",
+      "cpu_avg_pct": 0.6211196653542145,
+      "cpu_max_pct": 1.999843540240786,
+      "rss_avg_mb": 22.135061553030305,
+      "rss_max_mb": 25.5625,
+      "samples": 132
+    }
+  ],
+  "notes": [
+    "server on this laptop; store TiDB Cloud Starter aws-eu-central-1 over WAN (TLS); pool 32"
+  ]
+}

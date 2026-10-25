@@ -55,16 +55,24 @@ def label(r):
 
 
 def headline(d):
-    """Primary runs from headline-runs.txt (lines without a trailing comment)."""
+    """Chart rows: table B (every system, quieter hour) and the TiDB tables of
+    headline-runs.txt, one run per leg: uncommented rows, the warm WIP TiKV
+    rows and Airflow's 1 s polling pass."""
     p = os.path.join(d, "headline-runs.txt")
     if not os.path.exists(p):
         return None
-    keep = set()
+    keep, section = set(), ""
     for line in open(p):
-        if line.startswith("#") or "#" in line:
+        if line.startswith("## "):
+            section = line[3:]
             continue
-        if line.strip():
-            keep.add(line.strip())
+        if line.startswith("#") or not line.strip():
+            continue
+        run, _, note = line.partition("#")
+        if not (section.startswith("B") or section.startswith("TiDB")):
+            continue
+        if not note.strip() or "warm" in note or "every 1 s" in note:
+            keep.add(run.strip())
     return keep
 
 
@@ -89,7 +97,7 @@ def bars(rows, workload, out):
         ax.text(val, i, f"  {val:.1f}", va="center", color=INK2, fontsize=9)
     ax.set_yticks(list(y), [label(r) for r in rs])
     ax.set_xlabel("completed workflows per second")
-    ax.set_title(f"{workload}: throughput", loc="left", color=INK, fontsize=11)
+    ax.set_title(f"{workload}: throughput (table B, quieter hour; TiKV = WIP FW1 build)", loc="left", color=INK, fontsize=11)
     ax.grid(axis="x", color=GRID, linewidth=0.8)
     ax.set_axisbelow(True)
     for s in ("top", "right"):
@@ -115,7 +123,7 @@ def latency(rows, workload, out):
     ax.set_yticks(range(len(rs)), [label(r) for r in rs])
     ax.set_xscale("log")
     ax.set_xlabel("start-to-complete latency, ms (log scale)")
-    ax.set_title(f"{workload}: workflow latency", loc="left", color=INK, fontsize=11)
+    ax.set_title(f"{workload}: workflow latency (table B, quieter hour)", loc="left", color=INK, fontsize=11)
     ax.grid(axis="x", color=GRID, linewidth=0.8, which="both")
     ax.set_axisbelow(True)
     for s in ("top", "right"):

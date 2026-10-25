@@ -1,0 +1,98 @@
+{
+  "run_id": "resonate-tidb-alicloud-ap-southeast-1-fanout-1792915614",
+  "system": "resonate",
+  "backend": "tidb-alicloud-ap-southeast-1",
+  "workload": "fanout",
+  "params": {
+    "concurrency": 4,
+    "k": 8,
+    "n": 40,
+    "wake": "push"
+  },
+  "started": 40,
+  "completed": 35,
+  "failed": 5,
+  "retries": 27,
+  "wall_s": 655.704768109,
+  "throughput_wf_s": 0.05337768108799512,
+  "latency": {
+    "n": 35,
+    "mean_ms": 59690.12582414286,
+    "p50_ms": 49022.538441,
+    "p95_ms": 97697.303392,
+    "p99_ms": 138865.369131,
+    "max_ms": 138865.369131
+  },
+  "steps": {
+    "activity": {
+      "n": 318,
+      "mean_ms": 40066.53784156918,
+      "p50_ms": 31603.561669,
+      "p95_ms": 121653.904595,
+      "p99_ms": 128628.258538,
+      "max_ms": 131171.599063
+    }
+  },
+  "sleep_lateness": null,
+  "requests": {
+    "task.create": {
+      "n": 40,
+      "mean_ms": 3892.718376925,
+      "p50_ms": 2869.826437,
+      "p95_ms": 11472.937034,
+      "p99_ms": 12313.137465,
+      "max_ms": 12313.137465
+    },
+    "task.fence(promise.create)": {
+      "n": 323,
+      "mean_ms": 10900.13529147059,
+      "p50_ms": 7992.131438,
+      "p95_ms": 30487.742438,
+      "p99_ms": 58248.0474,
+      "max_ms": 60001.426568
+    },
+    "task.fence(promise.settle)": {
+      "n": 344,
+      "mean_ms": 27326.5182452093,
+      "p50_ms": 22578.731559,
+      "p95_ms": 60001.121413,
+      "p99_ms": 60001.51932,
+      "max_ms": 60002.168886
+    },
+    "task.fulfill": {
+      "n": 38,
+      "mean_ms": 5165.395096210526,
+      "p50_ms": 4258.891509,
+      "p95_ms": 13851.501837,
+      "p99_ms": 14877.279367,
+      "max_ms": 14877.279367
+    },
+    "task.heartbeat": {
+      "n": 48,
+      "mean_ms": 27546.73157045833,
+      "p50_ms": 21981.089408,
+      "p95_ms": 60001.181241,
+      "p99_ms": 60001.423838,
+      "max_ms": 60001.423838
+    }
+  },
+  "request_errors": 35,
+  "errors": {
+    "fence settle 409: Version mismatch": 1,
+    "fence settle 500: Internal error: Storage error: pool timed out while waiting fo": 1,
+    "task.fulfill 409: Task version mismatch or invalid state": 3
+  },
+  "resources": [
+    {
+      "target": "pid:630134",
+      "cpu_avg_pct": 0.4158257791468086,
+      "cpu_max_pct": 1.9998432062930969,
+      "rss_avg_mb": 18.177728402140673,
+      "rss_max_mb": 21.5078125,
+      "samples": 654
+    }
+  ],
+  "notes": [
+    "server on this laptop; store TiDB Cloud Starter alicloud-ap-southeast-1 over WAN (TLS); pool 32"
+  ]
+}

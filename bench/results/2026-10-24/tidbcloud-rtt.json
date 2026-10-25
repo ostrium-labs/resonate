@@ -1,0 +1,17 @@
+{"max_ms":513.996802,"min_ms":50.466909,"n":30,"p50_ms":307.642277,"p95_ms":513.511367,"target":"<cluster-endpoint>:4000","backend":"tidb-aws-ap-southeast-1","region":"aws-ap-southeast-1"}
+{"max_ms":767.534943,"min_ms":119.730402,"n":30,"p50_ms":304.755053,"p95_ms":518.589391,"target":"<cluster-endpoint>:4000","backend":"tidb-aws-ap-southeast-1","region":"aws-ap-southeast-1"}
+{"max_ms":1119.810912,"min_ms":116.713346,"n":30,"p50_ms":512.242171,"p95_ms":923.449955,"target":"<cluster-endpoint>:4000","backend":"tidb-aws-ap-northeast-1","region":"aws-ap-northeast-1"}
+{"max_ms":984.684657,"min_ms":51.906941,"n":30,"p50_ms":290.50348,"p95_ms":670.425666,"target":"<cluster-endpoint>:4000","backend":"tidb-aws-eu-central-1","region":"aws-eu-central-1"}
+{"max_ms":1159.506542,"min_ms":61.419132,"n":30,"p50_ms":301.391612,"p95_ms":528.446924,"target":"<cluster-endpoint>:4000","backend":"tidb-aws-us-east-1","region":"aws-us-east-1"}
+{"max_ms":519.77789,"min_ms":50.313021,"n":30,"p50_ms":302.586344,"p95_ms":460.104067,"target":"<cluster-endpoint>:4000","backend":"tidb-aws-us-west-2","region":"aws-us-west-2"}
+{"max_ms":608.724931,"min_ms":106.253264,"n":30,"p50_ms":302.525508,"p95_ms":315.069409,"target":"<cluster-endpoint>:4000","backend":"tidb-aws-sa-east-1","region":"aws-sa-east-1"}
+{"max_ms":812.635782,"min_ms":97.380021,"n":30,"p50_ms":301.981257,"p95_ms":317.415423,"target":"<cluster-endpoint>:4000","backend":"tidb-alicloud-ap-southeast-1","region":"alicloud-ap-southeast-1"}
+{"max_ms":867.739172,"min_ms":79.888241,"n":30,"p50_ms":276.546016,"p95_ms":314.277361,"target":"<cluster-endpoint>:4000","backend":"tidb-aws-ap-southeast-1","region":"aws-ap-southeast-1"}
+{"max_ms":615.594859,"min_ms":77.194027,"n":30,"p50_ms":294.601921,"p95_ms":534.820001,"target":"<cluster-endpoint>:4000","backend":"tidb-aws-ap-northeast-1","region":"aws-ap-northeast-1"}
+{"max_ms":396.829051,"min_ms":24.435269,"n":30,"p50_ms":76.15797,"p95_ms":373.686018,"target":"<cluster-endpoint>:4000","backend":"tidb-aws-eu-central-1","region":"aws-eu-central-1"}
+{"max_ms":738.154712,"min_ms":37.623932,"n":30,"p50_ms":261.418891,"p95_ms":711.418319,"target":"<cluster-endpoint>:4000","backend":"tidb-aws-eu-central-1","region":"aws-eu-central-1"}
+{"max_ms":799.918745,"min_ms":18.044418,"n":30,"p50_ms":225.637731,"p95_ms":745.207601,"target":"<cluster-endpoint>:4000","backend":"tidb-aws-us-east-1","region":"aws-us-east-1"}
+{"max_ms":398.504014,"min_ms":21.511143,"n":30,"p50_ms":135.528635,"p95_ms":376.419128,"target":"<cluster-endpoint>:4000","backend":"tidb-aws-us-west-2","region":"aws-us-west-2"}
+{"max_ms":526.608222,"min_ms":18.4966,"n":30,"p50_ms":124.529704,"p95_ms":308.96004,"target":"<cluster-endpoint>:4000","backend":"tidb-aws-us-west-2","region":"aws-us-west-2"}
+{"max_ms":1083.048875,"min_ms":17.73189,"n":30,"p50_ms":120.016586,"p95_ms":308.623216,"target":"<cluster-endpoint>:4000","backend":"tidb-aws-sa-east-1","region":"aws-sa-east-1"}
+{"max_ms":1007.530721,"min_ms":113.225318,"n":30,"p50_ms":377.747662,"p95_ms":965.701336,"target":"<cluster-endpoint>:4000","backend":"tidb-alicloud-ap-southeast-1","region":"alicloud-ap-southeast-1"}

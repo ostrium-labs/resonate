@@ -1,0 +1,158 @@
+{
+  "run_id": "loams-durable-tikv-chain-1792917141",
+  "system": "loams-durable",
+  "backend": "tikv",
+  "workload": "chain",
+  "params": {
+    "concurrency": 20,
+    "l": 5,
+    "n": 100,
+    "sleep_ms": 1000,
+    "wake": "push"
+  },
+  "started": 100,
+  "completed": 100,
+  "failed": 0,
+  "retries": 0,
+  "wall_s": 190.244189841,
+  "throughput_wf_s": 0.5256402315549126,
+  "latency": {
+    "n": 100,
+    "mean_ms": 36294.80200165,
+    "p50_ms": 33300.378713,
+    "p95_ms": 59279.134,
+    "p99_ms": 76556.529357,
+    "max_ms": 82929.977518
+  },
+  "steps": {
+    "activity": {
+      "n": 500,
+      "mean_ms": 202.719927522,
+      "p50_ms": 113.341578,
+      "p95_ms": 615.914562,
+      "p99_ms": 1118.462288,
+      "max_ms": 1715.317759
+    },
+    "sleep": {
+      "n": 500,
+      "mean_ms": 6965.631624734,
+      "p50_ms": 5792.744011,
+      "p95_ms": 15645.143911,
+      "p99_ms": 24047.165216,
+      "max_ms": 26066.747159
+    }
+  },
+  "sleep_lateness": {
+    "n": 500,
+    "mean_ms": 5966.123812588,
+    "p50_ms": 4793.299047,
+    "p95_ms": 14645.670223,
+    "p99_ms": 23048.060825,
+    "max_ms": 25067.707602
+  },
+  "requests": {
+    "task.acquire": {
+      "n": 485,
+      "mean_ms": 285.5622506886598,
+      "p50_ms": 195.318149,
+      "p95_ms": 796.397707,
+      "p99_ms": 1220.720042,
+      "max_ms": 2109.548343
+    },
+    "task.create": {
+      "n": 100,
+      "mean_ms": 239.46950268,
+      "p50_ms": 193.760583,
+      "p95_ms": 577.200136,
+      "p99_ms": 766.540085,
+      "max_ms": 1394.321097
+    },
+    "task.fence(promise.create)": {
+      "n": 500,
+      "mean_ms": 111.115599092,
+      "p50_ms": 53.454754,
+      "p95_ms": 380.967349,
+      "p99_ms": 891.184001,
+      "max_ms": 1530.604366
+    },
+    "task.fence(promise.settle)": {
+      "n": 500,
+      "mean_ms": 91.494195288,
+      "p50_ms": 43.782319,
+      "p95_ms": 319.883296,
+      "p99_ms": 652.670109,
+      "max_ms": 965.397686
+    },
+    "task.fence(timer)": {
+      "n": 500,
+      "mean_ms": 288.82778418199996,
+      "p50_ms": 184.297438,
+      "p95_ms": 854.099638,
+      "p99_ms": 1613.28498,
+      "max_ms": 2829.007375
+    },
+    "task.fulfill": {
+      "n": 100,
+      "mean_ms": 212.48713526,
+      "p50_ms": 164.99174,
+      "p95_ms": 813.361868,
+      "p99_ms": 942.698491,
+      "max_ms": 1224.191204
+    },
+    "task.heartbeat": {
+      "n": 13,
+      "mean_ms": 1018.5987947692307,
+      "p50_ms": 763.220972,
+      "p95_ms": 2362.667261,
+      "p99_ms": 2440.921604,
+      "max_ms": 2440.921604
+    },
+    "task.suspend": {
+      "n": 500,
+      "mean_ms": 115.613217268,
+      "p50_ms": 46.067467,
+      "p95_ms": 438.969744,
+      "p99_ms": 974.42842,
+      "max_ms": 2106.417406
+    }
+  },
+  "request_errors": 0,
+  "errors": {},
+  "resources": [
+    {
+      "target": "container:rbench-loams",
+      "cpu_avg_pct": 6.388158733347757,
+      "cpu_max_pct": 25.537661254727666,
+      "rss_avg_mb": 90.7734375,
+      "rss_max_mb": 192.125,
+      "samples": 190
+    },
+    {
+      "target": "container:rbench-tikv-tikv",
+      "cpu_avg_pct": 5.663622995749667,
+      "cpu_max_pct": 25.576555495195596,
+      "rss_avg_mb": 216.00699013157896,
+      "rss_max_mb": 1266.546875,
+      "samples": 190
+    },
+    {
+      "target": "container:rbench-tikv-pd",
+      "cpu_avg_pct": 4.547563781819007,
+      "cpu_max_pct": 22.675663845881964,
+      "rss_avg_mb": 76.64237253289474,
+      "rss_max_mb": 94.42578125,
+      "samples": 190
+    },
+    {
+      "target": "proc:rbench",
+      "cpu_avg_pct": 0.8436154041154831,
+      "cpu_max_pct": 16.954051367340952,
+      "rss_avg_mb": 19.12950246710526,
+      "rss_max_mb": 36.03125,
+      "samples": 190
+    }
+  ],
+  "notes": [
+    "Loams 0.1.1 engine (ghcr image), Resonate endpoint /durable/ on its main listener, embedded Resonate on TiKV v8.5.8 (one PD, one TiKV, API v2 keyspace loams_durable), data on ext4 (/mnt/Projects); --durable-push"
+  ]
+}
