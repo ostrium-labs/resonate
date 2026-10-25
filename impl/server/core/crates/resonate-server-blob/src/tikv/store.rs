@@ -7,7 +7,14 @@
 //! ```text
 //! root ‖ "resonate/blob/" ‖ <object key>   →  revision (16 random bytes) ‖ body
 //! root ‖ "t/" ‖ <16 random bytes>           →  expires_ms (u64 BE) [‖ "F"]
+//! root ‖ "resonate/ix/" ‖ <entry>           →  "\0"           (FW6)
 //! ```
+//!
+//! The `resonate/ix/` keys are the search index ([`crate::index`]): names
+//! with a placeholder value, written in the same transaction as the
+//! document they describe ([`StoreIndex`]). They are new keys beside the
+//! 0.1.0 ones, which keep their exact format; a 0.1.x keyspace has none,
+//! and the server builds them on first use.
 //!
 //! The revision is random rather than a counter or a timestamp: deleting a
 //! key and creating it again can never make an old [`Etag`] match. The
@@ -49,18 +56,23 @@ use std::sync::{Arc, Mutex, RwLock};
 use std::time::{Duration, Instant};
 
 use async_trait::async_trait;
+use tikv_client::transaction::Mutation;
 use tikv_client::{
     CheckLevel, Config as ClientConfig, Error as TikvError, Key, Timestamp, Transaction,
     TransactionClient, TransactionOptions,
 };
 use uuid::Uuid;
 
-use crate::store::{Etag, Store, StoreError};
+use crate::store::{Etag, IndexDelta, IndexView, Store, StoreError, StoreIndex};
 
 /// Where object keys live under the root.
 pub const OBJECT_PREFIX: &[u8] = b"resonate/blob/";
 /// Where commit tokens live under the root.
 pub const TOKEN_PREFIX: &[u8] = b"t/";
+/// Where the search index's entries live under the root (FW6).
+pub const INDEX_PREFIX: &[u8] = b"resonate/ix/";
+/// The value of every index entry: the name is the entry.
+pub const INDEX_VALUE: &[u8] = b"\0";
 /// The length of the revision every value starts with.
 pub const REVISION_BYTES: usize = 16;
 /// How long a commit token is kept.
@@ -176,6 +188,15 @@ impl std::fmt::Debug for TikvStore {
             .field("root", &String::from_utf8_lossy(&self.root))
             .finish_non_exhaustive()
     }
+}
+
+/// What a write does to its object.
+#[derive(Clone, Copy)]
+enum Body<'a> {
+    Put(&'a [u8]),
+    Delete,
+    /// Leave it: the write is only its index entries, under its condition.
+    Keep,
 }
 
 /// How a write treats what is there.
@@ -466,6 +487,21 @@ impl TikvStore {
         value: Option<Vec<u8>>,
         condition: Condition,
     ) -> Result<(), StoreError> {
+        let body = match &value {
+            Some(v) => Body::Put(v),
+            None => Body::Delete,
+        };
+        self.write_with(key, body, condition, &[]).await
+    }
+
+    /// [`Self::write`], plus `extra` (index entries) in the same transaction.
+    async fn write_with(
+        &self,
+        key: Vec<u8>,
+        body: Body<'_>,
+        condition: Condition,
+        extra: &[Mutation],
+    ) -> Result<(), StoreError> {
         let deadline = Instant::now() + RUN_DEADLINE;
         let mut last = String::from("deadline passed");
         let mut contended = false;
@@ -480,7 +516,7 @@ impl TikvStore {
             }
             let token: [u8; 16] = std::array::from_fn(|_| fastrand::u8(..));
             match self
-                .attempt(&key, value.as_deref(), condition, &token, deadline)
+                .attempt(&key, body, condition, extra, &token, deadline)
                 .await
             {
                 Outcome::Done(result) => return result,
@@ -520,8 +556,9 @@ impl TikvStore {
     async fn attempt(
         &self,
         key: &[u8],
-        value: Option<&[u8]>,
+        value: Body<'_>,
         condition: Condition,
+        extra: &[Mutation],
         token: &[u8; 16],
         deadline: Instant,
     ) -> Outcome<Result<(), StoreError>> {
@@ -557,11 +594,23 @@ impl TikvStore {
                 return Ok(false);
             }
             match value {
-                Some(value) => txn.put(Key::from(key.to_vec()), value.to_vec()).await?,
-                None => txn.delete(Key::from(key.to_vec())).await?,
+                Body::Put(value) => txn.put(Key::from(key.to_vec()), value.to_vec()).await?,
+                Body::Delete => txn.delete(Key::from(key.to_vec())).await?,
+                Body::Keep => {}
             }
-            txn.put(Key::from(self.token_key(token)), token_value(start_ms))
-                .await?;
+            if extra.is_empty() {
+                txn.put(Key::from(self.token_key(token)), token_value(start_ms))
+                    .await?;
+            } else {
+                let token =
+                    Mutation::Put(Key::from(self.token_key(token)), token_value(start_ms));
+                // One lock request for the entries and the token together.
+                // Only commits of this origin's document touch these
+                // entries, and each holds the document's lock first, so they
+                // never wait on each other.
+                txn.batch_mutate(extra.iter().cloned().chain([token]))
+                    .await?;
+            }
             Ok::<bool, TikvError>(true)
         };
         match tokio::time::timeout(remaining, body).await {
@@ -753,8 +802,267 @@ impl TikvStore {
     }
 }
 
+// ---------------------------------------------------------------------------
+// The search index (FW6)
+// ---------------------------------------------------------------------------
+
+impl TikvStore {
+    /// `root ‖ "resonate/ix/" ‖ entry`.
+    pub fn index_key(&self, entry: &str) -> Vec<u8> {
+        [&self.root[..], INDEX_PREFIX, entry.as_bytes()].concat()
+    }
+
+    fn index_mutations(&self, delta: &IndexDelta) -> Vec<Mutation> {
+        delta
+            .delete
+            .iter()
+            .map(|e| Mutation::Delete(Key::from(self.index_key(e))))
+            .chain(
+                delta
+                    .put
+                    .iter()
+                    .map(|e| Mutation::Put(Key::from(self.index_key(e)), INDEX_VALUE.to_vec())),
+            )
+            .collect()
+    }
+
+    /// Entries written with no condition: the marker and `debug.reset`.
+    /// Every mutation is idempotent, so a lost answer is simply retried.
+    async fn blind(&self, mutations: Vec<Mutation>) -> Result<(), StoreError> {
+        if mutations.is_empty() {
+            return Ok(());
+        }
+        let deadline = Instant::now() + RUN_DEADLINE;
+        let mut last = String::from("deadline passed");
+        for attempt in 1..=MAX_ATTEMPTS {
+            if attempt > 1 {
+                self.note(|s| s.restarts += 1);
+                let pause = backoff(attempt);
+                if Instant::now() + pause >= deadline {
+                    break;
+                }
+                tokio::time::sleep(pause).await;
+            }
+            let (client, generation) = self.clients.get();
+            let remaining = deadline.saturating_duration_since(Instant::now());
+            let mut txn = match tokio::time::timeout(
+                remaining,
+                client.begin_with_options(self.options(false)),
+            )
+            .await
+            {
+                Ok(Ok(txn)) => txn,
+                Ok(Err(e)) => {
+                    self.after_error(&e, generation).await;
+                    if classify(&e) == Class::Fatal {
+                        return Err(StoreError::Unavailable(e.to_string()));
+                    }
+                    last = e.to_string();
+                    continue;
+                }
+                Err(_) => {
+                    last = "TiKV begin timed out".into();
+                    continue;
+                }
+            };
+            let remaining = deadline.saturating_duration_since(Instant::now());
+            let run = async {
+                txn.batch_mutate(mutations.clone()).await?;
+                txn.commit().await
+            };
+            match tokio::time::timeout(remaining, run).await {
+                Ok(Ok(_)) => return Ok(()),
+                Ok(Err(e)) => {
+                    if classify(&e) != Class::Undetermined {
+                        self.rollback(&mut txn).await;
+                    }
+                    self.after_error(&e, generation).await;
+                    if classify(&e) == Class::Fatal {
+                        return Err(StoreError::Unavailable(e.to_string()));
+                    }
+                    last = e.to_string();
+                }
+                Err(_) => last = "TiKV index write timed out".into(),
+            }
+        }
+        Err(StoreError::Unavailable(format!(
+            "TiKV index write gave up: {last}"
+        )))
+    }
+}
+
+#[async_trait]
+impl StoreIndex for TikvStore {
+    async fn put_indexed(
+        &self,
+        name: &str,
+        body: Vec<u8>,
+        expected: Option<&Etag>,
+        delta: &IndexDelta,
+    ) -> Result<Etag, StoreError> {
+        let condition = match expected {
+            Some(etag) => Condition::Match(
+                Uuid::parse_str(&etag.0).map_err(|_| StoreError::PreconditionFailed)?,
+            ),
+            None => Condition::Absent,
+        };
+        let revision = Uuid::new_v4();
+        let mut value = Vec::with_capacity(REVISION_BYTES + body.len());
+        value.extend_from_slice(revision.as_bytes());
+        value.extend_from_slice(&body);
+        self.write_with(
+            self.object_key(name),
+            Body::Put(&value),
+            condition,
+            &self.index_mutations(delta),
+        )
+        .await?;
+        Ok(Etag(revision.to_string()))
+    }
+
+    async fn index_if_match(
+        &self,
+        name: &str,
+        etag: &Etag,
+        delta: &IndexDelta,
+    ) -> Result<(), StoreError> {
+        let expected = Uuid::parse_str(&etag.0).map_err(|_| StoreError::PreconditionFailed)?;
+        self.write_with(
+            self.object_key(name),
+            Body::Keep,
+            Condition::Match(expected),
+            &self.index_mutations(delta),
+        )
+        .await
+    }
+
+    async fn index_apply(&self, delta: &IndexDelta) -> Result<(), StoreError> {
+        self.blind(self.index_mutations(delta)).await
+    }
+
+    async fn view(&self) -> Result<Box<dyn IndexView>, StoreError> {
+        let snapshot = self.read(|| self.snapshot()).await?;
+        Ok(Box::new(TikvView {
+            store: self.clone(),
+            snapshot,
+        }))
+    }
+}
+
+/// Reads at one TiKV timestamp. A read at a fixed timestamp always gives the
+/// same answer, so a fault is retried on the same snapshot.
+struct TikvView {
+    store: TikvStore,
+    snapshot: tikv_client::Snapshot,
+}
+
+impl TikvView {
+    fn deadline() -> Instant {
+        Instant::now() + RUN_DEADLINE
+    }
+
+    async fn pause(attempt: u32, deadline: Instant, why: &str) -> Result<(), StoreError> {
+        let pause = backoff(attempt + 1);
+        if Instant::now() + pause >= deadline {
+            return Err(StoreError::Unavailable(why.to_string()));
+        }
+        tracing::debug!(attempt, why, "TiKV index read retried");
+        tokio::time::sleep(pause).await;
+        Ok(())
+    }
+}
+
+#[async_trait]
+impl IndexView for TikvView {
+    async fn scan(
+        &mut self,
+        start: &str,
+        end: &str,
+        limit: usize,
+    ) -> Result<Vec<String>, StoreError> {
+        if limit == 0 {
+            return Ok(Vec::new());
+        }
+        let from = self.store.index_key(start);
+        let to = if end.is_empty() {
+            successor(&self.store.index_key(""))
+        } else {
+            self.store.index_key(end)
+        };
+        let strip = self.store.root.len() + INDEX_PREFIX.len();
+        let limit = u32::try_from(limit).unwrap_or(u32::MAX);
+        let deadline = Self::deadline();
+        let mut attempt = 0;
+        let keys: Vec<Key> = loop {
+            let range: tikv_client::BoundRange = if to.is_empty() {
+                (Key::from(from.clone())..).into()
+            } else {
+                (Key::from(from.clone())..Key::from(to.clone())).into()
+            };
+            match tokio::time::timeout(
+                self.store.request_timeout,
+                self.snapshot.scan_keys(range, limit),
+            )
+            .await
+            {
+                Ok(Ok(keys)) => break keys.collect(),
+                Ok(Err(e)) => Self::pause(attempt, deadline, &format!("TiKV index scan: {e}")).await?,
+                Err(_) => Self::pause(attempt, deadline, "TiKV index scan timed out").await?,
+            }
+            attempt += 1;
+        };
+        keys.into_iter()
+            .map(|key| {
+                let key: Vec<u8> = key.into();
+                let name = key.get(strip..).ok_or_else(|| {
+                    StoreError::Unavailable("TiKV returned a key outside the index".into())
+                })?;
+                String::from_utf8(name.to_vec())
+                    .map_err(|e| StoreError::Unavailable(format!("invalid index entry: {e}")))
+            })
+            .collect()
+    }
+
+    async fn get_many(
+        &mut self,
+        names: &[String],
+    ) -> Result<Vec<Option<(Vec<u8>, Etag)>>, StoreError> {
+        if names.is_empty() {
+            return Ok(Vec::new());
+        }
+        let keys: Vec<Vec<u8>> = names.iter().map(|n| self.store.object_key(n)).collect();
+        let deadline = Self::deadline();
+        let mut attempt = 0;
+        let mut found: std::collections::HashMap<Vec<u8>, Vec<u8>> = loop {
+            match tokio::time::timeout(
+                self.store.request_timeout,
+                self.snapshot
+                    .batch_get(keys.iter().cloned().map(Key::from)),
+            )
+            .await
+            {
+                Ok(Ok(pairs)) => {
+                    break pairs
+                        .map(|pair| (Vec::<u8>::from(pair.key().clone()), pair.value().clone()))
+                        .collect()
+                }
+                Ok(Err(e)) => Self::pause(attempt, deadline, &format!("TiKV batch get: {e}")).await?,
+                Err(_) => Self::pause(attempt, deadline, "TiKV batch get timed out").await?,
+            }
+            attempt += 1;
+        };
+        keys.iter()
+            .map(|k| found.remove(k).map(decode).transpose())
+            .collect()
+    }
+}
+
 #[async_trait]
 impl Store for TikvStore {
+    fn index(&self) -> Option<&dyn StoreIndex> {
+        Some(self)
+    }
+
     async fn get(&self, name: &str) -> Result<Option<(Vec<u8>, Etag)>, StoreError> {
         let key = self.object_key(name);
         let value = self

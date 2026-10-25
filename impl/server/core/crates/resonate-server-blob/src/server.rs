@@ -211,6 +211,19 @@ impl Server {
         }
     }
 
+    /// Builds the search index if the store has one and it is not built
+    /// (see [`crate::index`]). Searches answer correctly without it — by
+    /// scanning, and starting this in the background — so calling it is
+    /// only about when the cost is paid.
+    pub async fn build_index(&self) -> Result<(), Unavailable> {
+        self.scan.build_index().await
+    }
+
+    /// Whether searches read the index right now rather than scan.
+    pub fn index_in_use(&self) -> bool {
+        self.scan.index_in_use()
+    }
+
     /// The read cache, shared by the actors and the scan service.
     pub fn cache(&self) -> &Arc<dyn DocCache> {
         &self.cache
@@ -397,6 +410,8 @@ impl Server {
                 .await
                 .map_err(|e| Unavailable::new(e.to_string()))?;
         }
+        // The entries described the documents just deleted.
+        self.scan.reset_index().await?;
         // Order matters: the objects are gone, so anything still holding a
         // document or a queued message is holding a ghost.
         self.actors.reset().await;

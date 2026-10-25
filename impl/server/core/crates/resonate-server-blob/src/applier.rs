@@ -14,7 +14,8 @@
 //!    a deadline the document is about to arm is already covered if the process
 //!    dies here. Once durable, the key is mirrored into the timer queue, which
 //!    is what lets the firing loop run without listing.
-//! 2. **CAS the document.**
+//! 2. **CAS the document**, with the index entries it changes in the same
+//!    commit on a store that has an index ([`crate::index`]).
 //! 3. **DELETE the old timer object** (best effort) — after, so nothing is
 //!    left uncovered in between. A failure leaves an orphan armed in the
 //!    queue, which fires it as a no-op and collects it.
@@ -72,6 +73,7 @@ use resonate_core::Unavailable;
 
 use super::cache::DocCache;
 use super::codec;
+use super::index;
 use super::sender::Sender;
 use super::store::{Etag, Store, StoreError};
 use super::timer_queue::TimerQueue;
@@ -121,7 +123,7 @@ impl TimerEntry {
 /// Keys must round-trip and must not grow structure: `/` would create a path
 /// segment and `:` is the origin/lineage separator this design reserves, so
 /// both are escaped along with everything non-alphanumeric.
-fn encode_key(s: &str) -> String {
+pub(crate) fn encode_key(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     for b in s.as_bytes() {
         match b {
@@ -132,7 +134,7 @@ fn encode_key(s: &str) -> String {
     out
 }
 
-fn decode_key(s: &str) -> Option<String> {
+pub(crate) fn decode_key(s: &str) -> Option<String> {
     let bytes = s.as_bytes();
     let mut out: Vec<u8> = Vec::with_capacity(bytes.len());
     let mut i = 0;
@@ -743,9 +745,18 @@ async fn perform(
     doc.gen = loaded.doc.gen.saturating_add(1);
     let body = codec::encode(&doc, origin);
     let key = shared.keys.doc_key(origin);
-    let etag = match &loaded.etag {
-        Some(etag) => shared.store.put_if_match(&key, body, etag).await?,
-        None => shared.store.put_if_none_match(&key, body).await?,
+    let etag = match shared.store.index() {
+        // The entries the change implies ride the same commit, so the index
+        // never disagrees with a document it describes.
+        Some(ix) => {
+            let delta = index::delta(&shared.keys, origin, &loaded.doc, &doc);
+            ix.put_indexed(&key, body, loaded.etag.as_ref(), &delta)
+                .await?
+        }
+        None => match &loaded.etag {
+            Some(etag) => shared.store.put_if_match(&key, body, etag).await?,
+            None => shared.store.put_if_none_match(&key, body).await?,
+        },
     };
     shared.cache.put(origin, Arc::new(doc), etag);
 

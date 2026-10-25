@@ -6,7 +6,10 @@
 // (minus its engine port), so while the copy stays true this is also the
 // cross-backend check in disguise: matching the copy is matching `main`'s
 // semantics. It runs entirely in process against the in-memory store — no
-// bucket, no database.
+// bucket, no database. Two blob servers run there: one over the object
+// store, which searches by scan, and one over `MemStore`, which searches
+// through the index (FW6). With `TEST_TIKV_PD` set the blob server is on
+// TiKV and searches through its index.
 //
 // This is the server-level sibling of `diff/differential.rs`. What that
 // harness compares at the engine port — returned messages, armed deadlines,
@@ -26,6 +29,7 @@ use resonate_core::types::{
 use resonate_core::ResonateServer;
 use resonate_server_blob::oracle::{Oracle, SharedOracle};
 use resonate_server_blob::server::{Server, ServerCfg};
+use resonate_server_blob::store::MemStore;
 use serde_json::{json, Value};
 
 /// Every backend gets the same limit, or `preload` would differ by
@@ -78,6 +82,11 @@ fn req(kind: &str, data: Value) -> RequestEnvelope {
 }
 
 type Backend = Arc<dyn ResonateServer>;
+
+/// Whether the blob server under test is on TiKV.
+fn on_tikv() -> bool {
+    cfg!(feature = "tikv") && std::env::var("TEST_TIKV_PD").is_ok_and(|s| !s.is_empty())
+}
 
 /// The blob server under test: in memory, or on TiKV when `TEST_TIKV_PD`
 /// names a PD (feature `tikv`), under a fresh root in `TEST_TIKV_KEYSPACE`.
@@ -147,10 +156,24 @@ async fn differential_random() {
     let server = blob_server().await;
     let oracle = Arc::new(SharedOracle::with_preload_limit(PRELOAD_LIMIT));
 
-    let backends: Vec<(String, Backend)> = vec![
-        ("blob".into(), server as Backend),
-        ("oracle".into(), Arc::clone(&oracle) as Backend),
-    ];
+    // Searches by index on TiKV; in memory, the object store scans, so a
+    // second blob server over `MemStore` runs the indexed searches beside it.
+    let indexed: Option<Arc<Server>> = (!server.index_in_use() && !on_tikv()).then(|| {
+        Server::build(
+            Arc::new(MemStore::new()),
+            Arc::new(resonate_server_blob::sender::NullRouter),
+            ServerCfg {
+                debug: true,
+                search: true,
+                ..Default::default()
+            },
+        )
+    });
+    let mut backends: Vec<(String, Backend)> = vec![("blob".into(), Arc::clone(&server) as Backend)];
+    if let Some(indexed) = &indexed {
+        backends.push(("blob-indexed".into(), Arc::clone(indexed) as Backend));
+    }
+    backends.push(("oracle".into(), Arc::clone(&oracle) as Backend));
 
     const MAX_STEPS: usize = 200_000;
     const BATCH_SIZE: usize = 200;
@@ -241,6 +264,14 @@ async fn differential_random() {
 
     let snaps = snap_all(&backends, now).await;
     assert_snaps_agree(&snaps, "final");
+
+    // Every reset marks an indexed store built, so the indexed servers have
+    // been searching by index, not falling back to the scan.
+    for s in std::iter::once(&server).chain(indexed.iter()) {
+        if on_tikv() || !Arc::ptr_eq(s, &server) {
+            assert!(s.index_in_use(), "an indexed blob server searched by scan");
+        }
+    }
 
     eprintln!("[diff] coverage after {total_steps} steps:");
     let mut missing = Vec::new();
@@ -563,7 +594,7 @@ fn build_envelope(
         Op::PromiseSettle => (gen_promise_settle(rng, oracle), now),
         Op::PromiseRegisterCallback => (gen_promise_register_callback(rng, oracle), now),
         Op::PromiseRegisterListener => (gen_promise_register_listener(rng, oracle), now),
-        Op::PromiseSearch => (gen_promise_search(rng), now),
+        Op::PromiseSearch => (gen_promise_search(rng, oracle), now),
         Op::TaskCreate => (gen_task_create(rng, now), now),
         Op::TaskGet => (gen_task_get(rng, oracle), now),
         Op::TaskAcquire => (gen_task_acquire(rng, oracle), now),
@@ -585,7 +616,14 @@ fn build_envelope(
 
 fn gen_promise_create(rng: &mut fastrand::Rng, oracle: &Oracle, now: i64) -> RequestEnvelope {
     let all = oracle.all_promise_ids();
-    let id = pick(rng, &all).unwrap_or_else(|| random_promise_id(rng));
+    // One create in five is in another origin, so a search crosses
+    // documents. They sort after `diff:`, which keeps `pick_awaited` finding
+    // same-origin promises first.
+    let id = if rng.u32(0..5) == 0 {
+        side_promise_id(rng)
+    } else {
+        pick(rng, &all).unwrap_or_else(|| random_promise_id(rng))
+    };
     let timeout_at = now + rng.i64(30_000..300_000);
     // Roughly half the pool is awaitable. Create is idempotent by id, so an
     // id's tags are fixed by its first success and the pool stays split —
@@ -596,6 +634,12 @@ fn gen_promise_create(rng: &mut fastrand::Rng, oracle: &Oracle, now: i64) -> Req
     } else {
         json!({})
     };
+    // Half carry a run tag, the way Loams tags every promise, so a search by
+    // tag has something to find and something to skip.
+    let mut tags = tags;
+    if rng.bool() {
+        tags["loams:run"] = json!(format!("r{}", rng.u32(0..2)));
+    }
     req(
         "promise.create",
         json!({ "id": id, "timeoutAt": timeout_at, "param": {}, "tags": tags }),
@@ -661,13 +705,51 @@ fn gen_promise_register_listener(rng: &mut fastrand::Rng, oracle: &Oracle) -> Re
     )
 }
 
-fn gen_promise_search(rng: &mut fastrand::Rng) -> RequestEnvelope {
-    let data = match rng.u32(0..4) {
-        0 => json!({ "state": "pending",  "limit": 10 }),
-        1 => json!({ "state": "resolved", "limit": 10 }),
-        _ => json!({ "limit": 10 }),
+/// Every state, so the projection of an expired pending promise is read;
+/// one tag or two, so a tag is both looked up and checked; small pages and
+/// cursors, so every backend's paging is compared, a cursor that is not an
+/// id and one past the end included.
+fn gen_promise_search(rng: &mut fastrand::Rng, oracle: &Oracle) -> RequestEnvelope {
+    let limit = [10, 10, 3, 1][rng.usize(0..4)];
+    let mut data = json!({ "limit": limit });
+    let state = match rng.u32(0..8) {
+        0 | 1 => Some("pending"),
+        2 | 3 => Some("resolved"),
+        4 => Some("rejected"),
+        5 => Some("rejected_timedout"),
+        _ => None,
     };
+    if let Some(state) = state {
+        data["state"] = json!(state);
+    }
+    let tags = match rng.u32(0..8) {
+        0 => Some(json!({ "resonate:external": "true" })),
+        1 | 2 => Some(json!({ "loams:run": format!("r{}", rng.u32(0..2)) })),
+        3 => Some(json!({ "loams:run": "r1", "resonate:external": "true" })),
+        4 => Some(json!({ "resonate:timer": "true" })),
+        _ => None,
+    };
+    if let Some(tags) = tags {
+        data["tags"] = tags;
+    }
+    if let Some(cursor) = gen_cursor(rng, &oracle.all_promise_ids()) {
+        data["cursor"] = json!(cursor);
+    }
     req("promise.search", data)
+}
+
+/// No cursor two times in three; otherwise an id from `ids`, a string
+/// between ids, or one past them all.
+fn gen_cursor(rng: &mut fastrand::Rng, ids: &[String]) -> Option<String> {
+    match rng.u32(0..9) {
+        0..=5 => None,
+        6 | 7 => Some(pick(rng, ids).unwrap_or_else(|| "diff:p3".to_string())),
+        _ => Some(["diff:p4z", "side", "zzz"][rng.usize(0..3)].to_string()),
+    }
+}
+
+fn side_promise_id(rng: &mut fastrand::Rng) -> String {
+    format!("side{}:p{}", rng.u32(0..2), rng.u32(0..4))
 }
 
 fn gen_task_create(rng: &mut fastrand::Rng, now: i64) -> RequestEnvelope {
@@ -850,13 +932,18 @@ fn gen_task_continue(rng: &mut fastrand::Rng, oracle: &Oracle) -> RequestEnvelop
 }
 
 fn gen_task_search(rng: &mut fastrand::Rng) -> RequestEnvelope {
-    let data = match rng.u32(0..5) {
-        0 => json!({ "state": "acquired",  "limit": 10 }),
-        1 => json!({ "state": "pending",   "limit": 10 }),
-        2 => json!({ "state": "suspended", "limit": 10 }),
-        3 => json!({ "state": "halted",    "limit": 10 }),
-        _ => json!({ "limit": 10 }),
+    let limit = [10, 10, 2][rng.usize(0..3)];
+    let mut data = match rng.u32(0..5) {
+        0 => json!({ "state": "acquired",  "limit": limit }),
+        1 => json!({ "state": "pending",   "limit": limit }),
+        2 => json!({ "state": "suspended", "limit": limit }),
+        3 => json!({ "state": "halted",    "limit": limit }),
+        _ => json!({ "limit": limit }),
     };
+    let tasks: Vec<String> = (0..8).map(task_id).collect();
+    if let Some(cursor) = gen_cursor(rng, &tasks) {
+        data["cursor"] = json!(cursor);
+    }
     req("task.search", data)
 }
 
@@ -890,7 +977,12 @@ fn gen_schedule_delete(rng: &mut fastrand::Rng, oracle: &Oracle) -> RequestEnvel
 
 fn gen_schedule_search(rng: &mut fastrand::Rng) -> RequestEnvelope {
     let limit = if rng.bool() { 10 } else { 5 };
-    req("schedule.search", json!({ "limit": limit }))
+    let mut data = json!({ "limit": limit });
+    let schedules: Vec<String> = (0..4).map(schedule_id).collect();
+    if let Some(cursor) = gen_cursor(rng, &schedules) {
+        data["cursor"] = json!(cursor);
+    }
+    req("schedule.search", data)
 }
 
 fn gen_debug_tick(rng: &mut fastrand::Rng, now: i64) -> (RequestEnvelope, i64) {

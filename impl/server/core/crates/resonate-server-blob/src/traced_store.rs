@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 
-use crate::store::{Etag, Store, StoreError};
+use crate::store::{inner_index, Etag, IndexDelta, IndexView, Store, StoreError, StoreIndex};
 
 /// A [`Store`] that traces and times what it forwards.
 pub struct TracedStore {
@@ -101,6 +101,98 @@ impl Store for TracedStore {
 
     fn system(&self) -> &'static str {
         self.system
+    }
+
+    fn index(&self) -> Option<&dyn StoreIndex> {
+        self.inner.index().map(|_| self as &dyn StoreIndex)
+    }
+}
+
+#[async_trait]
+impl StoreIndex for TracedStore {
+    async fn put_indexed(
+        &self,
+        key: &str,
+        body: Vec<u8>,
+        expected: Option<&Etag>,
+        delta: &IndexDelta,
+    ) -> Result<Etag, StoreError> {
+        let ix = inner_index(&self.inner)?;
+        resonate_trace::store_op(
+            self.system,
+            "put_indexed",
+            answered,
+            ix.put_indexed(key, body, expected, delta),
+        )
+        .await
+    }
+
+    async fn index_if_match(
+        &self,
+        key: &str,
+        etag: &Etag,
+        delta: &IndexDelta,
+    ) -> Result<(), StoreError> {
+        let ix = inner_index(&self.inner)?;
+        resonate_trace::store_op(
+            self.system,
+            "index_if_match",
+            answered,
+            ix.index_if_match(key, etag, delta),
+        )
+        .await
+    }
+
+    async fn index_apply(&self, delta: &IndexDelta) -> Result<(), StoreError> {
+        let ix = inner_index(&self.inner)?;
+        resonate_trace::store_op(self.system, "index_apply", answered, ix.index_apply(delta))
+            .await
+    }
+
+    async fn view(&self) -> Result<Box<dyn IndexView>, StoreError> {
+        let ix = inner_index(&self.inner)?;
+        let inner = resonate_trace::store_op(self.system, "index_view", answered, ix.view()).await?;
+        Ok(Box::new(TracedView {
+            inner,
+            system: self.system,
+        }))
+    }
+}
+
+/// A view whose reads are traced and timed like the store's own.
+struct TracedView {
+    inner: Box<dyn IndexView>,
+    system: &'static str,
+}
+
+#[async_trait]
+impl IndexView for TracedView {
+    async fn scan(
+        &mut self,
+        start: &str,
+        end: &str,
+        limit: usize,
+    ) -> Result<Vec<String>, StoreError> {
+        resonate_trace::store_op(
+            self.system,
+            "index_scan",
+            answered,
+            self.inner.scan(start, end, limit),
+        )
+        .await
+    }
+
+    async fn get_many(
+        &mut self,
+        keys: &[String],
+    ) -> Result<Vec<Option<(Vec<u8>, Etag)>>, StoreError> {
+        resonate_trace::store_op(
+            self.system,
+            "index_get_many",
+            answered,
+            self.inner.get_many(keys),
+        )
+        .await
     }
 }
 

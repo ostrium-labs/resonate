@@ -24,6 +24,7 @@
 pub mod applier;
 pub mod cache;
 pub mod codec;
+pub mod index;
 pub mod kernel;
 pub mod metrics;
 pub mod oracle;

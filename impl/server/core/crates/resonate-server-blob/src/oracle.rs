@@ -630,7 +630,14 @@ impl Oracle {
         let start = r
             .cursor
             .as_deref()
-            .and_then(|c| promises.iter().position(|p| p.id.as_str() > c))
+            // `id > cursor`, as the SQL queries page: a cursor past the last
+            // id is an empty page, not the first one.
+            .map(|c| {
+                promises
+                    .iter()
+                    .position(|p| p.id.as_str() > c)
+                    .unwrap_or(promises.len())
+            })
             .unwrap_or(0);
         let page: Vec<_> = promises.into_iter().skip(start).take(limit + 1).collect();
         let has_more = page.len() > limit;
@@ -1537,7 +1544,14 @@ impl Oracle {
         let start = r
             .cursor
             .as_deref()
-            .and_then(|c| tasks.iter().position(|t| t.id.as_str() > c))
+            // `id > cursor`, as the SQL queries page: a cursor past the last
+            // id is an empty page, not the first one.
+            .map(|c| {
+                tasks
+                    .iter()
+                    .position(|t| t.id.as_str() > c)
+                    .unwrap_or(tasks.len())
+            })
             .unwrap_or(0);
         let page: Vec<_> = tasks.into_iter().skip(start).take(limit + 1).collect();
         let has_more = page.len() > limit;
@@ -1705,7 +1719,14 @@ impl Oracle {
         let start = r
             .cursor
             .as_deref()
-            .and_then(|c| schedules.iter().position(|s| s.id.as_str() > c))
+            // `id > cursor`, as the SQL queries page: a cursor past the last
+            // id is an empty page, not the first one.
+            .map(|c| {
+                schedules
+                    .iter()
+                    .position(|s| s.id.as_str() > c)
+                    .unwrap_or(schedules.len())
+            })
             .unwrap_or(0);
         let page: Vec<_> = schedules.into_iter().skip(start).take(limit + 1).collect();
         let has_more = page.len() > limit;

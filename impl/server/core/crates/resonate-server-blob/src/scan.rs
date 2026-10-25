@@ -2,13 +2,19 @@
 //!
 //! # Contract
 //!
-//! Everything here is a LIST of the document prefix followed by a decode of
-//! each object, filtered and projected in memory. That is O(origins) GETs per
+//! On a store with an index ([`crate::index`], TiKV), `promise.search` and
+//! `task.search` read the index: O(results). Everywhere else — an object
+//! store, `schedule.search`, `debug.snap`, and a store whose index is not
+//! built yet — this is a LIST of the prefix followed by a decode of each
+//! object, filtered and projected in memory. That is O(origins) GETs per
 //! query, which is honest for a small deployment and for the differential
 //! suite, and plainly wrong for a large one — the production caveat, stated
-//! rather than hidden (and why the searches can be disabled by config). This
-//! module is the seam where a secondary index would go, and adding one would
-//! not touch the applier or the kernel.
+//! rather than hidden (and why the searches can be disabled by config).
+//!
+//! An index without its marker (a store written before the index existed)
+//! is answered by the scan, and the first such search starts the one-time
+//! rebuild in the background; once the marker is written, searches move to
+//! the index. Both paths answer the same pages.
 //!
 //! Reads are cache-first but never *write* the cache. Only the applier does
 //! that, so a scan racing a write cannot leave a stale entry behind for the
@@ -33,6 +39,7 @@
 //! `schedule.search` and `debug.snap` here.
 
 use std::collections::BTreeMap;
+use std::sync::atomic::{AtomicU8, Ordering};
 use std::sync::Arc;
 
 use crate::kernel::state::{OriginDoc, Reply};
@@ -47,12 +54,18 @@ use resonate_core::Unavailable;
 use super::applier::KeySpace;
 use super::cache::DocCache;
 use super::codec;
+use super::index;
 use super::schedules::ScheduleService;
 use super::sender::Sender;
-use super::store::Store;
+use super::store::{Store, StoreError, StoreIndex};
 
 /// The largest page any search will return, matching the SQL handlers.
 const MAX_LIMIT: i64 = 1_000;
+
+/// Where the index stands, as this process last saw it.
+const INDEX_UNKNOWN: u8 = 0;
+const INDEX_BUILDING: u8 = 1;
+const INDEX_BUILT: u8 = 2;
 
 pub struct ScanService {
     store: Arc<dyn Store>,
@@ -60,6 +73,7 @@ pub struct ScanService {
     schedules: Arc<ScheduleService>,
     sender: Arc<Sender>,
     keys: KeySpace,
+    index_state: Arc<AtomicU8>,
 }
 
 impl ScanService {
@@ -76,7 +90,99 @@ impl ScanService {
             schedules,
             sender,
             keys,
+            index_state: Arc::new(AtomicU8::new(INDEX_UNKNOWN)),
         }
+    }
+
+    // -----------------------------------------------------------------------
+    // The index
+    // -----------------------------------------------------------------------
+
+    /// The index, if the store has one and it is built. If it has one that
+    /// is not, the rebuild is started (once) and the caller scans.
+    async fn ready_index(&self) -> Option<&dyn StoreIndex> {
+        let ix = self.store.index()?;
+        match self.index_state.load(Ordering::Acquire) {
+            INDEX_BUILT => return Some(ix),
+            INDEX_BUILDING => return None,
+            _ => {}
+        }
+        match index::is_built(ix, &self.keys).await {
+            Ok(true) => {
+                self.index_state.store(INDEX_BUILT, Ordering::Release);
+                Some(ix)
+            }
+            Ok(false) => {
+                self.spawn_rebuild();
+                None
+            }
+            Err(error) => {
+                tracing::warn!(%error, "Index marker unreadable; searching by scan");
+                None
+            }
+        }
+    }
+
+    fn spawn_rebuild(&self) {
+        if self
+            .index_state
+            .compare_exchange(
+                INDEX_UNKNOWN,
+                INDEX_BUILDING,
+                Ordering::AcqRel,
+                Ordering::Acquire,
+            )
+            .is_err()
+        {
+            return;
+        }
+        let store = Arc::clone(&self.store);
+        let keys = self.keys.clone();
+        let state = Arc::clone(&self.index_state);
+        tokio::spawn(async move {
+            let result = run_rebuild(&store, &keys).await;
+            settle_rebuild(&state, result);
+        });
+    }
+
+    /// Builds the index now, if the store has one and it is not built:
+    /// what the plugin runs at startup, and tests run to be sure which path
+    /// a search takes. Safe beside writers and beside a rebuild elsewhere.
+    pub async fn build_index(&self) -> Result<(), Unavailable> {
+        let Some(ix) = self.store.index() else {
+            return Ok(());
+        };
+        if index::is_built(ix, &self.keys)
+            .await
+            .map_err(|e| Unavailable::new(e.to_string()))?
+        {
+            self.index_state.store(INDEX_BUILT, Ordering::Release);
+            return Ok(());
+        }
+        let documents = run_rebuild(&self.store, &self.keys)
+            .await
+            .map_err(|e| Unavailable::new(e.to_string()))?;
+        tracing::info!(documents, "Search index built");
+        self.index_state.store(INDEX_BUILT, Ordering::Release);
+        Ok(())
+    }
+
+    /// `debug.reset`, after the documents are gone: drop every entry, and
+    /// mark the (now empty) store indexed.
+    pub async fn reset_index(&self) -> Result<(), Unavailable> {
+        let Some(ix) = self.store.index() else {
+            return Ok(());
+        };
+        index::reset(ix, &self.keys)
+            .await
+            .map_err(|e| Unavailable::new(e.to_string()))?;
+        self.index_state.store(INDEX_BUILT, Ordering::Release);
+        Ok(())
+    }
+
+    /// Whether searches read the index (`true`) or scan (`false`) right now.
+    pub fn index_in_use(&self) -> bool {
+        self.store.index().is_some() && self.index_state.load(Ordering::Acquire) == INDEX_BUILT
     }
 
     /// Every origin document, by origin.
@@ -139,6 +245,14 @@ impl ScanService {
             Ok(l) => l,
             Err(reply) => return Ok(reply),
         };
+        if let Some(ix) = self.ready_index().await {
+            let mut view = ix.view().await.map_err(unavailable)?;
+            let found = index::search_promises(view.as_mut(), &self.keys, q, page_len(limit), now)
+                .await
+                .map_err(unavailable)?;
+            let (promises, cursor) = paginate(found, None, limit, |p| &p.id);
+            return Ok(Reply::ok(&PromiseSearchResponseData { promises, cursor }));
+        }
         let matches: Vec<PromiseRecord> = self
             .promises()
             .await?
@@ -164,6 +278,14 @@ impl ScanService {
             Ok(l) => l,
             Err(reply) => return Ok(reply),
         };
+        if let Some(ix) = self.ready_index().await {
+            let mut view = ix.view().await.map_err(unavailable)?;
+            let found = index::search_tasks(view.as_mut(), &self.keys, q, page_len(limit))
+                .await
+                .map_err(unavailable)?;
+            let (tasks, cursor) = paginate(found, None, limit, |t| &t.id);
+            return Ok(Reply::ok(&TaskSearchResponseData { tasks, cursor }));
+        }
         let mut matches: Vec<TaskRecord> = Vec::new();
         for doc in self.documents().await?.values() {
             for (id, t) in &doc.tasks {
@@ -284,6 +406,43 @@ impl ScanService {
             task_timeouts,
             messages: self.sender.snapshot(),
         })
+    }
+}
+
+fn unavailable(e: StoreError) -> Unavailable {
+    Unavailable::new(e.to_string())
+}
+
+/// A page's length as the index reads it. A limit below one returns
+/// nothing, as `LIMIT 0` does.
+fn page_len(limit: i64) -> usize {
+    usize::try_from(limit.max(0)).unwrap_or(0)
+}
+
+async fn run_rebuild(store: &Arc<dyn Store>, keys: &KeySpace) -> Result<u64, StoreError> {
+    let ix = store
+        .index()
+        .ok_or_else(|| StoreError::Unavailable("the store has no index".into()))?;
+    tracing::info!("Building the search index");
+    index::rebuild(store.as_ref(), ix, keys).await
+}
+
+fn settle_rebuild(state: &AtomicU8, result: Result<u64, StoreError>) {
+    match result {
+        Ok(documents) => {
+            tracing::info!(documents, "Search index built");
+            state.store(INDEX_BUILT, Ordering::Release);
+        }
+        Err(error) => {
+            // The next search starts it again.
+            tracing::warn!(%error, "Building the search index failed; searching by scan");
+            let _ = state.compare_exchange(
+                INDEX_BUILDING,
+                INDEX_UNKNOWN,
+                Ordering::AcqRel,
+                Ordering::Acquire,
+            );
+        }
     }
 }
 
@@ -704,5 +863,421 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(reply.data["promises"].as_array().unwrap().len(), 1);
+    }
+}
+
+/// The indexed searches against the scan, over one store.
+#[cfg(test)]
+mod indexed_tests {
+    use super::*;
+    use crate::applier::{ApplierCfg, OriginActors};
+    use crate::cache::MemDocCache;
+    use crate::kernel::state::Req;
+    use crate::sender::NullRouter;
+    use crate::store::{CountingStore, Etag, FaultStore, MemStore, StoreError};
+    use async_trait::async_trait;
+    use serde_json::{json, Value};
+    use std::collections::BTreeSet;
+
+    const W: &str = "http://worker:9999";
+
+    fn keys() -> KeySpace {
+        KeySpace::new("p", 4)
+    }
+
+    /// The same store with its index hidden: what an object store sees, and
+    /// what a server from before the index writes.
+    struct NoIndex(Arc<dyn Store>);
+
+    #[async_trait]
+    impl Store for NoIndex {
+        async fn get(&self, key: &str) -> Result<Option<(Vec<u8>, Etag)>, StoreError> {
+            self.0.get(key).await
+        }
+        async fn put_if_match(
+            &self,
+            key: &str,
+            body: Vec<u8>,
+            etag: &Etag,
+        ) -> Result<Etag, StoreError> {
+            self.0.put_if_match(key, body, etag).await
+        }
+        async fn put_if_none_match(&self, key: &str, body: Vec<u8>) -> Result<Etag, StoreError> {
+            self.0.put_if_none_match(key, body).await
+        }
+        async fn put(&self, key: &str, body: Vec<u8>) -> Result<Etag, StoreError> {
+            self.0.put(key, body).await
+        }
+        async fn delete(&self, key: &str) -> Result<(), StoreError> {
+            self.0.delete(key).await
+        }
+        async fn list(&self, prefix: &str, max_keys: usize) -> Result<Vec<String>, StoreError> {
+            self.0.list(prefix, max_keys).await
+        }
+    }
+
+    fn actors(store: Arc<dyn Store>) -> Arc<OriginActors> {
+        Arc::new(OriginActors::new(
+            store,
+            Arc::new(MemDocCache::new(64)),
+            Arc::new(Sender::new(Arc::new(NullRouter), true)),
+            Arc::new(crate::timer_queue::TimerQueue::new()),
+            keys(),
+            ApplierCfg::default(),
+        ))
+    }
+
+    fn scan_over(store: Arc<dyn Store>) -> ScanService {
+        let applier = actors(Arc::clone(&store));
+        let schedules = Arc::new(ScheduleService::new(
+            Arc::clone(&store),
+            applier,
+            Arc::new(crate::timer_queue::TimerQueue::new()),
+            keys(),
+        ));
+        ScanService::new(
+            store,
+            Arc::new(MemDocCache::new(64)),
+            schedules,
+            Arc::new(Sender::new(Arc::new(NullRouter), true)),
+            keys(),
+        )
+    }
+
+    fn parse<T: serde::de::DeserializeOwned>(v: Value) -> T {
+        serde_json::from_value(v).unwrap()
+    }
+
+    fn create(id: &str, timeout_at: i64, tags: Value) -> Req {
+        Req::PromiseCreate(parse(
+            json!({ "id": id, "timeoutAt": timeout_at, "param": {}, "tags": tags }),
+        ))
+    }
+
+    /// A seeded workload over many origins: tagged, external, timer and
+    /// runnable promises, tasks, settlements, sweeps, and one id too long
+    /// for an entry. Returns the time it ended at.
+    async fn workload(applier: &OriginActors, seed: u64, steps: usize) -> i64 {
+        let mut rng = fastrand::Rng::with_seed(seed);
+        let mut now = 1_000_000;
+        let long = format!("o3:{}", "x".repeat(crate::index::MAX_ID + 10));
+        for _ in 0..steps {
+            now += rng.i64(0..2_000);
+            let origin = format!("o{}", rng.u32(0..12));
+            let id = if rng.u32(0..40) == 0 {
+                long.clone()
+            } else {
+                format!("{origin}:p{}", rng.u32(0..6))
+            };
+            let origin = crate::index::origin_of(&id).to_string();
+            let req = match rng.u32(0..10) {
+                0..=4 => {
+                    let mut tags = serde_json::Map::new();
+                    if rng.bool() {
+                        tags.insert("loams:run".into(), json!(format!("r{}", rng.u32(0..3))));
+                    }
+                    match rng.u32(0..5) {
+                        0 => {
+                            tags.insert("resonate:external".into(), json!("true"));
+                        }
+                        1 => {
+                            tags.insert("resonate:timer".into(), json!("true"));
+                        }
+                        2 => {
+                            tags.insert("resonate:target".into(), json!(W));
+                        }
+                        _ => {}
+                    }
+                    create(&id, now + rng.i64(1..60_000), Value::Object(tags))
+                }
+                5..=6 => {
+                    let state = ["resolved", "rejected", "rejected_canceled"][rng.usize(0..3)];
+                    Req::PromiseSettle(parse(
+                        json!({ "id": id, "state": state, "value": {} }),
+                    ))
+                }
+                7 => Req::TaskCreate(parse(json!({
+                    "pid": "pid", "ttl": 60_000, "action": {
+                        "kind": "promise.create", "head": {}, "data": {
+                            "id": id, "timeoutAt": now + 90_000, "param": {},
+                            "tags": { "resonate:target": W } } } }))),
+                _ => {
+                    applier.tick(&origin, now).await.unwrap();
+                    continue;
+                }
+            };
+            applier.submit(&origin, req, now).await.unwrap();
+        }
+        now
+    }
+
+    fn promise_queries() -> Vec<Value> {
+        let states = [
+            None,
+            Some("pending"),
+            Some("resolved"),
+            Some("rejected"),
+            Some("rejected_canceled"),
+            Some("rejected_timedout"),
+        ];
+        let tags = [
+            None,
+            Some(json!({ "loams:run": "r1" })),
+            Some(json!({ "loams:run": "r1", "resonate:external": "true" })),
+            Some(json!({ "resonate:timer": "true" })),
+            Some(json!({ "resonate:target": W })),
+            Some(json!({ "nobody": "has" })),
+        ];
+        let mut out = Vec::new();
+        for state in states {
+            for tag in &tags {
+                for limit in [1, 4, 100] {
+                    let mut q = json!({ "limit": limit });
+                    if let Some(s) = state {
+                        q["state"] = json!(s);
+                    }
+                    if let Some(t) = tag {
+                        q["tags"] = t.clone();
+                    }
+                    out.push(q);
+                }
+            }
+        }
+        out
+    }
+
+    /// Every page of `q`, following the cursor.
+    async fn pages(scan: &ScanService, q: &Value, now: i64, tasks: bool) -> Vec<Value> {
+        let mut out = Vec::new();
+        let mut q = q.clone();
+        loop {
+            let reply = if tasks {
+                scan.search_tasks(&parse(q.clone())).await.unwrap()
+            } else {
+                scan.search_promises(&parse(q.clone()), now).await.unwrap()
+            };
+            assert_eq!(reply.status, 200);
+            let cursor = reply.data.get("cursor").cloned();
+            out.push(reply.data);
+            match cursor {
+                Some(c) => q["cursor"] = c,
+                None => return out,
+            }
+            assert!(out.len() < 1_000, "a search that never ends");
+        }
+    }
+
+    /// The entries every document implies, from the documents themselves.
+    async fn implied(store: &MemStore) -> BTreeSet<String> {
+        let mut out = BTreeSet::new();
+        for key in store.list(&keys().doc_prefix(), usize::MAX).await.unwrap() {
+            let origin = keys().origin_of_doc_key(&key).unwrap();
+            let (bytes, _) = store.get(&key).await.unwrap().unwrap();
+            let doc = codec::decode(&bytes, &origin).unwrap();
+            out.extend(crate::index::entries(&keys(), &origin, &doc));
+        }
+        out
+    }
+
+    async fn assert_same_answers(indexed: &ScanService, scanned: &ScanService, now: i64) {
+        assert!(indexed.index_in_use() || indexed.build_index().await.is_ok());
+        assert!(indexed.index_in_use(), "the indexed service reads the index");
+        assert!(!scanned.index_in_use());
+        for at in [now, now + 30_000, now + 200_000] {
+            for q in promise_queries() {
+                assert_eq!(
+                    pages(indexed, &q, at, false).await,
+                    pages(scanned, &q, at, false).await,
+                    "promise.search {q} at {at}"
+                );
+            }
+        }
+        for state in [None, Some("pending"), Some("acquired"), Some("fulfilled")] {
+            for limit in [1, 3, 100] {
+                let mut q = json!({ "limit": limit });
+                if let Some(s) = state {
+                    q["state"] = json!(s);
+                }
+                assert_eq!(
+                    pages(indexed, &q, now, true).await,
+                    pages(scanned, &q, now, true).await,
+                    "task.search {q}"
+                );
+            }
+        }
+        // Cursors that are not ids, before everything and after it.
+        for cursor in ["", "o1", "o5:p3z", "zzz"] {
+            let q = json!({ "limit": 5, "cursor": cursor });
+            assert_eq!(
+                pages(indexed, &q, now, false).await,
+                pages(scanned, &q, now, false).await,
+                "promise.search {q}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn the_index_answers_what_the_scan_answers() {
+        for seed in 1..=4 {
+            let mem = Arc::new(MemStore::new());
+            let store: Arc<dyn Store> = mem.clone();
+            let applier = actors(Arc::clone(&store));
+            let now = workload(&applier, seed, 600).await;
+            // Written through the index from the first document on, so the
+            // entries are exactly what the documents imply.
+            assert_eq!(
+                mem.entries()
+                    .into_iter()
+                    .filter(|e| !e.ends_with("ix/v1"))
+                    .collect::<BTreeSet<_>>(),
+                implied(&mem).await,
+                "seed {seed}"
+            );
+            let indexed = scan_over(Arc::clone(&store));
+            let scanned = scan_over(Arc::new(NoIndex(Arc::clone(&store))));
+            assert_same_answers(&indexed, &scanned, now).await;
+        }
+    }
+
+    #[tokio::test]
+    async fn an_indexed_search_reads_its_results_not_the_store() {
+        let counting = Arc::new(CountingStore::new(Arc::new(MemStore::new())));
+        let store: Arc<dyn Store> = counting.clone();
+        let applier = actors(Arc::clone(&store));
+        for n in 0..300 {
+            let tags = if n % 100 == 7 {
+                json!({ "loams:run": "needle" })
+            } else {
+                json!({ "loams:run": "hay" })
+            };
+            applier
+                .submit(&format!("w{n}"), create(&format!("w{n}:a"), 10_000_000, tags), 1_000)
+                .await
+                .unwrap();
+        }
+        let q = json!({ "tags": { "loams:run": "needle" }, "state": "pending", "limit": 10 });
+        let indexed = scan_over(Arc::clone(&store));
+        indexed.build_index().await.unwrap();
+        counting.reset_counts();
+        let reply = indexed.search_promises(&parse(q.clone()), 2_000).await.unwrap();
+        let by_index = counting.counts();
+        assert_eq!(reply.data["promises"].as_array().unwrap().len(), 3);
+
+        let scanned = scan_over(Arc::new(NoIndex(store)));
+        counting.reset_counts();
+        let reply_scan = scanned.search_promises(&parse(q), 2_000).await.unwrap();
+        let by_scan = counting.counts();
+        assert_eq!(reply.data, reply_scan.data);
+
+        eprintln!("[reads] 300 documents, 3 matches: index {by_index:?}, scan {by_scan:?}");
+        assert_eq!(by_index.objects(), 3, "one document per result");
+        assert_eq!(by_index.lists, 0);
+        // The state range, the overflow range: no more, whatever the store holds.
+        assert!(by_index.scans <= 2, "{by_index:?}");
+        assert_eq!(by_index.scanned, 3);
+        assert_eq!(by_scan.objects(), 300, "the scan reads every document");
+    }
+
+    #[tokio::test]
+    async fn a_store_written_without_the_index_is_scanned_then_rebuilt() {
+        let mem = Arc::new(MemStore::new());
+        let plain: Arc<dyn Store> = Arc::new(NoIndex(mem.clone()));
+        // An older server wrote all of this: no entries, no marker.
+        let now = workload(&actors(Arc::clone(&plain)), 7, 400).await;
+        assert!(mem.entries().is_empty());
+
+        let store: Arc<dyn Store> = mem.clone();
+        let indexed = scan_over(Arc::clone(&store));
+        let scanned = scan_over(Arc::clone(&plain));
+        let q = json!({ "state": "pending", "limit": 3 });
+        // Answered by the scan while the rebuild runs, and the same either way.
+        assert_eq!(
+            pages(&indexed, &q, now, false).await,
+            pages(&scanned, &q, now, false).await
+        );
+        indexed.build_index().await.unwrap();
+        assert!(indexed.index_in_use());
+        let mut built: BTreeSet<String> = mem.entries().into_iter().collect();
+        assert!(built.remove("p/ix/v1"), "the marker is written last");
+        assert_eq!(built, implied(&mem).await);
+        assert_same_answers(&indexed, &scanned, now).await;
+    }
+
+    #[tokio::test]
+    async fn the_first_search_starts_the_rebuild_by_itself() {
+        let mem = Arc::new(MemStore::new());
+        let plain: Arc<dyn Store> = Arc::new(NoIndex(mem.clone()));
+        let now = workload(&actors(plain), 3, 200).await;
+        let indexed = scan_over(mem.clone());
+        indexed
+            .search_promises(&parse(json!({ "limit": 1 })), now)
+            .await
+            .unwrap();
+        for _ in 0..200 {
+            if indexed.index_in_use() {
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+        }
+        assert!(indexed.index_in_use(), "the background rebuild finished");
+        let mut built: BTreeSet<String> = mem.entries().into_iter().collect();
+        assert!(built.remove("p/ix/v1"));
+        assert_eq!(built, implied(&mem).await);
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn a_rebuild_beside_writers_leaves_the_entries_exact() {
+        for seed in 10..14 {
+            let mem = Arc::new(MemStore::new());
+            let plain: Arc<dyn Store> = Arc::new(NoIndex(mem.clone()));
+            workload(&actors(plain), seed, 300).await;
+            // Index-aware writers keep going while two instances rebuild.
+            let store: Arc<dyn Store> = mem.clone();
+            let writers = actors(Arc::clone(&store));
+            let a = scan_over(Arc::clone(&store));
+            let b = scan_over(Arc::clone(&store));
+            let (_, ra, rb) = tokio::join!(
+                workload(&writers, seed + 100, 300),
+                a.build_index(),
+                b.build_index()
+            );
+            ra.unwrap();
+            rb.unwrap();
+            let mut built: BTreeSet<String> = mem.entries().into_iter().collect();
+            assert!(built.remove("p/ix/v1"));
+            assert_eq!(built, implied(&mem).await, "seed {seed}");
+        }
+    }
+
+    #[tokio::test]
+    async fn a_failed_commit_changes_neither_the_document_nor_its_entries() {
+        let mem = Arc::new(MemStore::new());
+        let fault = Arc::new(FaultStore::new(mem.clone()));
+        let applier = actors(fault.clone());
+        applier
+            .submit("o", create("o:a", 900_000, json!({ "t": "1" })), 1_000)
+            .await
+            .unwrap();
+        let entries = mem.entries();
+        let doc = mem.get(&keys().doc_key("o")).await.unwrap();
+        fault.fail_after(0);
+        let settle = Req::PromiseSettle(parse(
+            json!({ "id": "o:a", "state": "resolved", "value": {} }),
+        ));
+        assert!(applier.submit("o", settle, 2_000).await.is_err());
+        assert_eq!(mem.entries(), entries);
+        assert_eq!(mem.get(&keys().doc_key("o")).await.unwrap(), doc);
+    }
+
+    #[tokio::test]
+    async fn a_reset_store_is_indexed_and_empty() {
+        let mem = Arc::new(MemStore::new());
+        let store: Arc<dyn Store> = mem.clone();
+        workload(&actors(Arc::clone(&store)), 5, 100).await;
+        let scan = scan_over(Arc::clone(&store));
+        store.delete_prefix(&keys().doc_prefix()).await.unwrap();
+        scan.reset_index().await.unwrap();
+        assert_eq!(mem.entries(), vec!["p/ix/v1".to_string()]);
+        assert!(scan.index_in_use());
     }
 }

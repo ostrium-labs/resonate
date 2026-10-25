@@ -9,7 +9,10 @@
 // `Engine` contract to the two ports every server has, so a backend joins by
 // being a server and nothing else: the in-memory oracle, the SQL shell over
 // SQLite (Postgres and MySQL are the same shell), and the blob server over an
-// in-process object store all sit in one comparison.
+// in-process object store all sit in one comparison. The blob server runs
+// twice more: over `MemStore`, whose searches read the tag and state index
+// rather than every document (FW6), and, when `TEST_TIKV_PD` names a PD, on
+// TiKV, whose searches read the same index there.
 //
 // What is *not* compared here, by design: announced deadlines, `upcoming`,
 // and narrow `Internal` firing. Those are properties of the SQL engines'
@@ -68,6 +71,8 @@
 //
 // Knobs, all environment variables:
 //   TEST_MAX_STEPS=N          stop after N steps (default 200000)
+//   TEST_TIKV_PD=host:port   add the blob server on TiKV (TEST_TIKV_KEYSPACE,
+//                             default resonate_test; a fresh root per run)
 //   TEST_SOFT=1               log a response divergence and carry on while the
 //                             state and routed messages still agree; report
 //                             them all at the end
@@ -142,7 +147,7 @@ use resonate_core::types::{
 use resonate_core::{ResonateRouter, ResonateServer, Unavailable};
 use resonate_oracle::{Oracle, SharedOracle};
 use resonate_server_blob::server::{Server as BlobServer, ServerCfg as BlobCfg};
-use resonate_server_blob::store::ObjectStoreAdapter;
+use resonate_server_blob::store::{MemStore, ObjectStoreAdapter, Store as BlobStore};
 use resonate_server_mysql::MysqlEngine;
 use resonate_server_postgres::PostgresEngine;
 use resonate_server_sqlite::SqliteEngine;
@@ -424,9 +429,39 @@ async fn mysql_backend(url: String) -> Backend {
 }
 
 async fn blob_backend() -> Backend {
+    blob_backend_over("blob", Arc::new(ObjectStoreAdapter::in_memory())).await
+}
+
+/// The blob server over a store with a search index: the in-process
+/// reference, so the indexed searches are compared with SQLite's on every
+/// run (FW6).
+async fn blob_indexed_backend() -> Backend {
+    blob_backend_over("blob-indexed", Arc::new(MemStore::new())).await
+}
+
+/// The blob server on TiKV, under a fresh root in `TEST_TIKV_KEYSPACE`
+/// (default `resonate_test`). Opt-in through `TEST_TIKV_PD`.
+async fn blob_tikv_backend(pd: String) -> Backend {
+    use resonate_server_blob::tikv::{ensure_keyspace, keyspace::pd_http_url, TikvStore, TikvStoreCfg};
+    let keyspace = std::env::var("TEST_TIKV_KEYSPACE").unwrap_or_else(|_| "resonate_test".into());
+    let endpoints: Vec<String> = pd.split(',').map(str::to_owned).collect();
+    ensure_keyspace(&pd_http_url(&endpoints[0]), &keyspace)
+        .await
+        .expect("TEST_TIKV_PD keyspace");
+    let mut cfg = TikvStoreCfg::new(endpoints, keyspace);
+    cfg.root = format!("port-{:016x}/", fastrand::u64(..)).into_bytes();
+    eprintln!(
+        "[port] blob-tikv on {pd}, root {}",
+        String::from_utf8_lossy(&cfg.root)
+    );
+    let store = TikvStore::connect(cfg).await.expect("TEST_TIKV_PD");
+    blob_backend_over("blob-tikv", Arc::new(store)).await
+}
+
+async fn blob_backend_over(name: &str, store: Arc<dyn BlobStore>) -> Backend {
     let router = Arc::new(Recorder::default());
     let server = BlobServer::build(
-        Arc::new(ObjectStoreAdapter::in_memory()),
+        store,
         router.clone(),
         BlobCfg {
             debug: true,
@@ -437,7 +472,7 @@ async fn blob_backend() -> Backend {
     );
     server.init(true).await.expect("blob init");
     Backend {
-        name: "blob".into(),
+        name: name.into(),
         server,
         router,
     }
@@ -484,6 +519,11 @@ async fn port_differential_random() {
         Err(_) => eprintln!("[port] TEST_MYSQL_URL not set — mysql skipped"),
     }
     backends.push(blob_backend().await);
+    backends.push(blob_indexed_backend().await);
+    match std::env::var("TEST_TIKV_PD") {
+        Ok(pd) if !pd.is_empty() => backends.push(blob_tikv_backend(pd).await),
+        _ => eprintln!("[port] TEST_TIKV_PD not set — blob-tikv skipped"),
+    }
 
     if let Ok(want) = std::env::var("TEST_BACKENDS") {
         let want: Vec<&str> = want
@@ -1268,7 +1308,7 @@ fn build_envelope(
         Op::PromiseSettle => (gen_promise_settle(rng, oracle, now), now),
         Op::PromiseRegisterCallback => (gen_promise_register_callback(rng, oracle, now), now),
         Op::PromiseRegisterListener => (gen_promise_register_listener(rng, oracle, now), now),
-        Op::PromiseSearch => (gen_promise_search(rng, now), now),
+        Op::PromiseSearch => (gen_promise_search(rng, oracle, now), now),
         Op::TaskCreate => (gen_task_create(rng, now), now),
         Op::TaskGet => (gen_task_get(rng, oracle, now), now),
         Op::TaskAcquire => (gen_task_acquire(rng, oracle, now), now),
@@ -1290,7 +1330,14 @@ fn build_envelope(
 
 fn gen_promise_create(rng: &mut fastrand::Rng, oracle: &Oracle, now: i64) -> RequestEnvelope {
     let all = oracle.all_promise_ids();
-    let id = pick(rng, &all).unwrap_or_else(|| random_promise_id(rng));
+    // One create in five is in another origin, so a search crosses
+    // documents. They sort after `diff:`, which keeps `pick_awaited` finding
+    // same-origin promises first.
+    let id = if rng.u32(0..5) == 0 {
+        side_promise_id(rng)
+    } else {
+        pick(rng, &all).unwrap_or_else(|| random_promise_id(rng))
+    };
     let timeout_at = now + rng.i64(30_000..300_000);
     // Roughly half the pool is awaitable. Create is idempotent by id, so an
     // id's tags are fixed by its first success and the pool stays split —
@@ -1304,6 +1351,12 @@ fn gen_promise_create(rng: &mut fastrand::Rng, oracle: &Oracle, now: i64) -> Req
         3 => json!({ "resonate:timer": "true" }),
         _ => json!({}),
     };
+    // Half carry a run tag, the way Loams tags every promise, so a search by
+    // tag has something to find and something to skip.
+    let mut tags = tags;
+    if rng.bool() {
+        tags["loams:run"] = json!(format!("r{}", rng.u32(0..2)));
+    }
     req(
         "promise.create",
         json!({ "id": id, "timeoutAt": timeout_at, "param": {}, "tags": tags }),
@@ -1381,13 +1434,51 @@ fn gen_promise_register_listener(
     )
 }
 
-fn gen_promise_search(rng: &mut fastrand::Rng, now: i64) -> RequestEnvelope {
-    let data = match rng.u32(0..4) {
-        0 => json!({ "state": "pending",  "limit": 10 }),
-        1 => json!({ "state": "resolved", "limit": 10 }),
-        _ => json!({ "limit": 10 }),
+/// Every state, so the projection of an expired pending promise is read;
+/// one tag or two, so a tag is both looked up and checked; small pages and
+/// cursors, so every backend's paging is compared, a cursor that is not an
+/// id and one past the end included.
+fn gen_promise_search(rng: &mut fastrand::Rng, oracle: &Oracle, now: i64) -> RequestEnvelope {
+    let limit = [10, 10, 3, 1][rng.usize(0..4)];
+    let mut data = json!({ "limit": limit });
+    let state = match rng.u32(0..8) {
+        0 | 1 => Some("pending"),
+        2 | 3 => Some("resolved"),
+        4 => Some("rejected"),
+        5 => Some("rejected_timedout"),
+        _ => None,
     };
+    if let Some(state) = state {
+        data["state"] = json!(state);
+    }
+    let tags = match rng.u32(0..8) {
+        0 => Some(json!({ "resonate:external": "true" })),
+        1 | 2 => Some(json!({ "loams:run": format!("r{}", rng.u32(0..2)) })),
+        3 => Some(json!({ "loams:run": "r1", "resonate:external": "true" })),
+        4 => Some(json!({ "resonate:timer": "true" })),
+        _ => None,
+    };
+    if let Some(tags) = tags {
+        data["tags"] = tags;
+    }
+    if let Some(cursor) = gen_cursor(rng, &oracle.all_promise_ids()) {
+        data["cursor"] = json!(cursor);
+    }
     req("promise.search", data, now)
+}
+
+/// No cursor two times in three; otherwise an id from `ids`, a string
+/// between ids, or one past them all.
+fn gen_cursor(rng: &mut fastrand::Rng, ids: &[String]) -> Option<String> {
+    match rng.u32(0..9) {
+        0..=5 => None,
+        6 | 7 => Some(pick(rng, ids).unwrap_or_else(|| "diff:p3".to_string())),
+        _ => Some(["diff:p4z", "side", "zzz"][rng.usize(0..3)].to_string()),
+    }
+}
+
+fn side_promise_id(rng: &mut fastrand::Rng) -> String {
+    format!("side{}:p{}", rng.u32(0..2), rng.u32(0..4))
 }
 
 fn gen_task_create(rng: &mut fastrand::Rng, now: i64) -> RequestEnvelope {
@@ -1587,13 +1678,18 @@ fn gen_task_continue(rng: &mut fastrand::Rng, oracle: &Oracle, now: i64) -> Requ
 }
 
 fn gen_task_search(rng: &mut fastrand::Rng, now: i64) -> RequestEnvelope {
-    let data = match rng.u32(0..5) {
-        0 => json!({ "state": "acquired",  "limit": 10 }),
-        1 => json!({ "state": "pending",   "limit": 10 }),
-        2 => json!({ "state": "suspended", "limit": 10 }),
-        3 => json!({ "state": "halted",    "limit": 10 }),
-        _ => json!({ "limit": 10 }),
+    let limit = [10, 10, 2][rng.usize(0..3)];
+    let mut data = match rng.u32(0..5) {
+        0 => json!({ "state": "acquired",  "limit": limit }),
+        1 => json!({ "state": "pending",   "limit": limit }),
+        2 => json!({ "state": "suspended", "limit": limit }),
+        3 => json!({ "state": "halted",    "limit": limit }),
+        _ => json!({ "limit": limit }),
     };
+    let tasks: Vec<String> = (0..8).map(task_id).collect();
+    if let Some(cursor) = gen_cursor(rng, &tasks) {
+        data["cursor"] = json!(cursor);
+    }
     req("task.search", data, now)
 }
 
@@ -1628,7 +1724,12 @@ fn gen_schedule_delete(rng: &mut fastrand::Rng, oracle: &Oracle, now: i64) -> Re
 
 fn gen_schedule_search(rng: &mut fastrand::Rng, now: i64) -> RequestEnvelope {
     let limit = if rng.bool() { 10 } else { 5 };
-    req("schedule.search", json!({ "limit": limit }), now)
+    let mut data = json!({ "limit": limit });
+    let schedules: Vec<String> = (0..4).map(schedule_id).collect();
+    if let Some(cursor) = gen_cursor(rng, &schedules) {
+        data["cursor"] = json!(cursor);
+    }
+    req("schedule.search", data, now)
 }
 
 fn gen_debug_tick(rng: &mut fastrand::Rng, now: i64) -> (RequestEnvelope, i64) {
