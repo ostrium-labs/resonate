@@ -19,7 +19,7 @@ Stores, as named below:
 | SQLite | the SQL server (`resonate-sql`) over `resonate-server-sqlite` | always |
 | blob | `resonate-server-blob` over an in-memory object store | always |
 | Postgres | the SQL server over `resonate-server-postgres` | with `TEST_POSTGRES_URL` |
-| MySQL/TiDB | the SQL server over `resonate-server-mysql` | with `TEST_MYSQL_URL` (not run for FW7) |
+| MySQL/TiDB | the SQL server over `resonate-server-mysql` | with `TEST_MYSQL_URL` (run on TiDB v8.5.8 unistore: `podman run -p 127.0.0.1:14100:4000 ghcr.io/ostrium-labs/tidb:v8.5.8-loams.1`, `TEST_MYSQL_URL=mysql://root@127.0.0.1:14100/test`) |
 | S3 | `resonate-server-blob` over a bucket | not run (no bucket); from the code |
 | TiKV | `resonate-server-blob` over `resonate_server_blob::tikv` (FW1) | with feature `tikv` and `TEST_TIKV_PD` (§11) |
 
@@ -131,9 +131,17 @@ put every promise of a kind, across every namespace, in one origin (`wft`,
 - Any UTF-8 string of at least one byte, **except** one containing NUL
   (`\0`), which is 400 (`validate_promise_create_data`). Run: `/`, `%`,
   space, `ä€😀`, U+0001 and `.-_~!*'()` round-trip unchanged on every store.
-- **At most one `:` on Postgres.** The schema's
-  `well_formed_promise_id_at_most_one_separator` check (`^[^:]*(:[^:]*)?$`)
-  makes `a:b:c` a 500 there; the other stores accept it.
+- Any number of `:`. Run: `a:b:c`, `wft:n1:order-42:r1:3`, `x::y` and `::`
+  are accepted and round-trip on every store, and a whole task lifecycle on
+  such ids passes everywhere (`ids_with_several_colons_work_on_every_store`).
+  **Before `fix/postgres-multi-colon-ids`** (on `loams/main` up to FW7's
+  first PR), Postgres refused an id with more than one `:` with a 500, from
+  the schema check `well_formed_promise_id_at_most_one_separator`; that
+  check is dropped by migration `0002_ids_with_several_separators.sql`. A
+  database created before the fix migrates in place: the server applies
+  0002 at startup when the plugin's `migrate` option is set (without it, a
+  server whose database is behind refuses to start and names the pending
+  migration).
 - `resonate:origin`, `resonate:branch`, `resonate:parent` tags, when given,
   must be a prefix of the id (400 otherwise); `resonate:origin` and
   `resonate:prefix` may not contain `:`.
@@ -150,7 +158,7 @@ There is no length check in the protocol. Each store has its own limit:
 | oracle | none | — | — | run: 100 000 bytes accepted |
 | SQLite | none in practice (`TEXT`; SQLite's 1 GB string limit) | — | — | run: 100 000 bytes accepted |
 | Postgres | **2 692 bytes** for an incompressible id | btree index rows may not exceed 2 704 bytes (`promises_pkey`, `idx_promises_origin_id`, `idx_promises_task (task_state, id)`, `promises_task_key_unique`) | 500 `index row size … exceeds btree version 4 maximum 2704` | run: 2 692 accepted, 2 693 refused. A compressible id (`aaaa…`) is compressed in the index and goes further (100 000 accepted), so the limit depends on content |
-| MySQL / TiDB | **255 characters** | `promises.id VARCHAR(255)` (also `callbacks`, `listeners.promise_id`, `schedules.id`/`promise_id`, and the generated `origin_id`, `target`, `parent_id`, `branch_id`, and `listeners.address`, all `VARCHAR(255)`) | a strict-mode "data too long" error, a 500 | from `resonate-server-mysql/migrations/0001_initial.sql`; not run for FW7 |
+| MySQL / TiDB | **255 bytes** | the engine checks `id.len() > 255` in `promise.create` and `task.create`, for `promises.id VARCHAR(255)` | **400** `id exceeds maximum length of 255 characters` | run on TiDB v8.5.8 (unistore): 255 accepted, 256 refused. **Also:** `listeners.address` and the generated `target` column are `VARCHAR(255)`, and TiDB keeps only the first 255 bytes of a longer value **without an error**: a 311-byte listener address gets its `unblock` at a 255-byte address, and a 311-byte target is redispatched (after the first, which uses the request's value) to the truncated address (run; pinned in `id_rules_and_limits`). A known MySQL-plugin bug, not fixed here |
 | blob, in memory | none | — | — | run: 100 000 bytes accepted |
 | blob on S3 | only the **origin** is limited: the encoded origin must fit S3's 1 024-byte key | the timer key `<prefix>t/NN/<20 digits>_<enc(origin)>` is the longest key, so `len(enc(origin)) ≤ 998 − len(prefix)`; `enc` keeps `A–Z a–z 0–9 . -` and writes every other byte as `%XX` (3 bytes) | the bucket refuses the write | from `resonate-server-blob/src/applier.rs` (`KeySpace`, `encode_key`); not run |
 | TiKV (FW1) | only the **origin** is limited, against TiKV's 8 KiB key limit (`max-key-size`, measured on the encoded key): `len(root) + 14 + len(enc(origin))` for the document key, and the timer key adds 26 bytes; the lineage is inside the document | the key is `root ‖ "resonate/blob/" ‖ <object key>`, with `enc` as for S3 | TiKV answers `KeyTooLarge`; the store fails at once (no retry), and the request has no answer (503) | run: 2 692-byte ids accepted; a 100 000-byte id refused with `KeyTooLarge { size: 115929, limit: 8192 }` |
@@ -185,7 +193,7 @@ server's; any other key (`loams:ns`, `loams:run`, `loams:kind`, `loams:wf`,
 | `resonate:timer` | exactly `"true"` | at its deadline the promise **resolves** (not `rejected_timedout`). Any other value (`"1"`, `"false"`) is not a timer (run) |
 | `resonate:scope` | `"global"` | makes the promise **external** (see below) |
 | `resonate:external` | `"true"` | makes the promise external |
-| `resonate:delay` | an absolute time in ms, as a decimal string | hold back the first dispatch of the promise's task until then (§6.1); requires `resonate:target`, must be < `timeoutAt`, ≥ 0 and an integer (400 otherwise); forbidden in `task.create` (400). **Ignored by the SQL stores** (§9) |
+| `resonate:delay` | an absolute time in ms, as a decimal string | hold back the first dispatch of the promise's task until then (§6.1); requires `resonate:target`, must be < `timeoutAt`, ≥ 0 and an integer (400 otherwise); forbidden in `task.create` (400). Honoured by every store since `fix/sql-resonate-delay`; before it the SQL stores ignored it (§9) |
 | `resonate:origin`, `resonate:branch`, `resonate:parent`, `resonate:prefix` | ids | lineage bookkeeping for the SDKs; validated as in §3.2. `resonate:branch` also drives `preload` in task answers |
 | `resonate:schedule` | the schedule id | set by the server on promises a schedule creates |
 
@@ -270,14 +278,16 @@ Statuses common to all (401/403 auth, 500, 503) are in §2 and not repeated.
 | 200 | created with `timeoutAt ≤ now` | settled (`resolved` if a timer, else `rejected_timedout`), `createdAt = settledAt = timeoutAt`; a target's task is created `fulfilled` |
 | 200 | **the id exists, whatever its state and whatever this request's param, tags and deadline** | `{ "promise": <the stored record> }`. Nothing is changed and nothing is dispatched. There is no conflict answer: compare the record with what you sent |
 | 400 | missing/empty `id`, NUL in `id`, missing or negative `timeoutAt`, invalid `resonate:target` address, any tag rule in §3.2 and §4 broken | string |
-| 500 | Postgres: id with two `:`, timer with a target, id or indexed tag over the index limit; MySQL: over 255 | string |
+| 400 | MySQL/TiDB: id over 255 bytes | string |
+| 500 | Postgres: timer with a target, id or indexed tag over the index limit (and, before `fix/postgres-multi-colon-ids`, an id with two `:`) | string |
 
 Side effects of a create with a target: the task is created `pending` at
 version 0, and unless `resonate:delay` is in the future, an `execute`
 message goes to the target at once. A pending task's dispatch is repeated
 every `retry_timeout` (§7.2) until someone acquires it.
 
-`resonate:delay` (oracle, blob, TiKV; the spec's `createPromise`): the task
+`resonate:delay` (every store; the spec's `createPromise`; the SQL stores
+since `fix/sql-resonate-delay`, before which they dispatched at create): the task
 is still created `pending` at once; only the first `execute` is held back
 until the delay. **Delay holds back dispatch, not claiming:** a caller that
 knows the id can `task.acquire` it at version 0 before the delay (run), and
@@ -567,7 +577,9 @@ schedule   = <ns>.<schedule-id>                   no ':'; runs <ns>.<schedule-id
 
 - One origin per workflow run: everything of a run serializes on one blob
   document and nothing else does, and one `task.heartbeat` covers a run.
-- Exactly one `:` on Postgres, none in schedule ids.
+- No `:` in the origin (it ends at the first `:`), none in schedule ids.
+  More `:` after the first are fine on every store since
+  `fix/postgres-multi-colon-ids`; this grammar does not need them.
 - `<wf>` percent-encoded so that `:` and `.` cannot appear raw (`%3A`,
   `%2E`); `<ns>` the namespace id first, for token prefixes.
 - 255 bytes at most (§3.3); past that, hash `<wf>` and keep the full id in a
@@ -628,13 +640,13 @@ sweep. A deadline already past at create is created `rejected_timedout`.
 
 1. Attempt *n* fails: `task.fulfill … state: "rejected"`.
 2. Attempt *n+1*: `promise.create { id: <run>:act.5.<n+1>, tags: { "resonate:target": …, "resonate:delay": "<now + backoff, absolute ms>" } }`.
-   On oracle/blob/TiKV: `pending`, no `execute` until the delay, then
+   On every store: `pending`, no `execute` until the delay, then
    `execute { version: 0 }`.
 3. `resonate:delay` must be < `timeoutAt`, an integer ≥ 0, with a target.
-4. **On the SQL stores the delay is ignored and the attempt is dispatched at
-   create** (§9). Until that is fixed, a gateway on SQLite or Postgres does
-   backoff with a timer promise (§8.3) and creates attempt *n+1* when the
-   timer's `unblock` arrives (or its own backstop finds it resolved).
+4. On a server built before `fix/sql-resonate-delay`, the SQL stores ignore
+   the delay and dispatch at create (§9). A gateway that must run on such a
+   build does backoff with a timer promise (§8.3) and creates attempt *n+1*
+   when the timer's `unblock` arrives.
 
 ### 8.6 Signal [`signal_is_a_settle_of_a_waited_promise`]
 
@@ -669,36 +681,39 @@ completion, 200 with the fulfilled task.
 
 ## 9. Store differences
 
-Found by running the scenarios on oracle, SQLite, blob (in memory) and
-Postgres 17, on this branch:
+Found by running the scenarios on oracle, SQLite, blob (in memory),
+Postgres 17 and TiDB v8.5.8 through the MySQL plugin, on this branch:
 
-| behaviour | oracle | SQLite | Postgres | blob | MySQL/TiDB (code) |
+| behaviour | oracle | SQLite | Postgres | blob | MySQL/TiDB |
 |---|---|---|---|---|---|
-| `resonate:delay` holds back the first dispatch (as the spec says) | yes | **no: dispatched at create** | **no** | yes | no (same SQL server; no delay handling in `resonate-server-mysql`) |
-| id with two or more `:` | 200 | 200 | **500** | 200 | 200 |
-| `resonate:timer` + `resonate:target` | 200 | 200 | **500** | 200 | 200 |
-| promise id length | none | none | 2 692 B incompressible | none (S3: origin ≤ 998 − prefix encoded bytes) | 255 |
+| `resonate:timer` + `resonate:target` (outside the spec) | 200 | 200 | **500** | 200 | 200 |
+| promise id length | none | none | 2 692 B incompressible (500) | none (S3: origin ≤ 998 − prefix encoded bytes) | 255 B (400) |
+| target or listener address over 255 bytes | kept | kept | kept | kept | **truncated to 255 bytes, silently** |
 | missed schedule runs on a late sweep | all, all dispatched | one per sweep | one per sweep | all, live one dispatched | one per sweep |
 | `retry_timeout` default | (30 s in the model) | 30 s | 30 s | 60 s (TiKV plugin: 30 s) | 30 s |
 | searches | yes | yes | yes | off unless `search_enabled` (403) | yes |
 
 Everything else in §6 was the same on every store in the run.
 
-The `resonate:delay` gap is a divergence from the specification
-(`createPromise` in `spec/spec/02-abstract/state.lean` arms the task's
-first retry at `max(delay, now)`); the SQL engines never read the tag. The
-port differential does not catch it because its generator never sends the
-tag. It is a fork issue to fix in the SQL engines (separate change).
+Fixed by this branch (each is also a candidate upstream change, see
+`CARRIES.md`):
+
+| behaviour | before | after |
+|---|---|---|
+| `resonate:delay` holds back the first dispatch, as the spec's `createPromise` says (`retryTimeoutAt := max(delay, now)`) | oracle, blob: yes. SQLite, Postgres, MySQL: **no**, dispatched at create; the engines never read the tag, and the port differential's generator never sends it | every store (`fix/sql-resonate-delay`: the SQL engines set the retry deadline to the delay and emit nothing at create; the retry path dispatches) |
+| id with two or more `:` | 500 on Postgres (schema check), 200 elsewhere | 200 everywhere (`fix/postgres-multi-colon-ids`) |
 
 ## 10. What this changes in design 74
 
 For DX1 Task 0:
 
-1. **Ids (§5.4).** `wft:{ns}:{wf}:{run}:{eid}` and its siblings do not
-   work: they have up to five `:` (500 on Postgres), and their origin is the
-   kind (`wft`, `act`, …), so on blob/TiKV every promise of a kind across
-   all namespaces is one document, and `task.heartbeat` cannot batch across
-   runs anyway. Use §8.0: `<ns>.<wf>.<run>:<kind>.<event>[.<n>]`.
+1. **Ids (§5.4).** `wft:{ns}:{wf}:{run}:{eid}` and its siblings are
+   accepted by every store once `fix/postgres-multi-colon-ids` is in (before
+   it, Postgres answered 500). But their origin is the kind (`wft`, `act`,
+   …), so on blob/TiKV every promise of a kind across all namespaces is one
+   document rewritten by compare-and-set on every change, and
+   `task.heartbeat` cannot batch across runs. Use §8.0 instead:
+   `<ns>.<wf>.<run>:<kind>.<event>[.<n>]`.
 2. **ID limit:** 255 bytes (§3.3). Hash past it.
 3. **Timeouts (`to:`).** A promise with `resonate:timer` resolves at its
    deadline; it never becomes `rejectedTimedout`. Use
@@ -715,9 +730,9 @@ For DX1 Task 0:
 7. **Listener delivery is at most once.** A lost `unblock` is not resent.
    The gateway needs a reconcile loop (`promise.get` or `promise.search` by
    `loams:run`) behind the in-memory wake-ups of §5.6.
-8. **Retry backoff via `resonate:delay`** does not work on the SQL stores
-   today (§9). On SQLite (light compose) use a backoff timer until the SQL
-   engines are fixed.
+8. **Retry backoff via `resonate:delay`** works on every store once
+   `fix/sql-resonate-delay` is in the build Loams pins; before it the SQL
+   stores dispatched at create (§9).
 9. **Schedules** need a target, so the gateway is the target of its own
    schedules; missed runs are store-dependent (§6.12).
 
