@@ -758,9 +758,7 @@ mod tests {
         use resonate_plugin::types::{ExecuteMsg, ExecuteMsgData, ExecuteMsgTask, MessageHead};
         Message::Execute(ExecuteMsg {
             kind: "execute".to_string(),
-            head: MessageHead {
-                server_url: "http://server".to_string(),
-            },
+            head: MessageHead::new("http://server"),
             data: ExecuteMsgData {
                 task: ExecuteMsgTask {
                     id: task.to_string(),
