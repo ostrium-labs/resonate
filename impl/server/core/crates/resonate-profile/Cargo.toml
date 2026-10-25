@@ -1,0 +1,36 @@
+[package]
+name = "resonate-profile"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+description = "The gateway-facing protocol profile (docs/protocol-profile.md) as scenario tests, run through ResonateServer against every store."
+
+# Why a crate of its own rather than tests in resonate-oracle: the oracle is one
+# of the subjects here, not the harness. The scenarios run the same requests
+# against the oracle, SQLite, the blob server and, when configured, Postgres
+# and TiKV, so the crate that holds them has to depend on every store. Putting
+# that in resonate-oracle would make the reference model's crate pull sqlx and
+# object_store into its own test build, and would invert what it is for: the
+# thing the stores are compared against, depending on nothing but the core.
+
+[features]
+# The TiKV leg: the blob server over FW1's TiKV store. Run it with
+#   test/tikv/up.sh 23790 20260
+#   TEST_TIKV_PD=127.0.0.1:23790 cargo test -p resonate-profile --features tikv
+tikv = ["resonate-server-blob/tikv"]
+
+[dependencies]
+resonate-core = { version = "0.10.1", path = "../resonate-core" }
+resonate-oracle = { version = "0.10.1", path = "../resonate-oracle" }
+resonate-sql = { version = "0.10.1", path = "../resonate-sql" }
+resonate-server-sqlite = { version = "0.10.1", path = "../resonate-server-sqlite" }
+resonate-server-postgres = { version = "0.10.1", path = "../resonate-server-postgres" }
+resonate-server-mysql = { version = "0.10.1", path = "../resonate-server-mysql" }
+resonate-server-blob = { version = "0.10.1", path = "../resonate-server-blob" }
+async-trait = { workspace = true }
+serde_json = { workspace = true }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync"] }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync"] }
