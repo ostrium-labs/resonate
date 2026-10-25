@@ -21,7 +21,7 @@ Stores, as named below:
 | Postgres | the SQL server over `resonate-server-postgres` | with `TEST_POSTGRES_URL` |
 | MySQL/TiDB | the SQL server over `resonate-server-mysql` | with `TEST_MYSQL_URL` (not run for FW7) |
 | S3 | `resonate-server-blob` over a bucket | not run (no bucket); from the code |
-| TiKV | `resonate-server-blob` over `resonate_server_blob::tikv` (FW1) | with `--cfg resonate_profile_tikv` and `TEST_TIKV_PD`, once FW1 merges (§11) |
+| TiKV | `resonate-server-blob` over `resonate_server_blob::tikv` (FW1) | with feature `tikv` and `TEST_TIKV_PD` (§11) |
 
 Contents:
 
@@ -736,16 +736,16 @@ TEST_BACKENDS=sqlite,postgres ...                                # only these
 TEST_TRACE_DIR=/path ...                                         # NDJSON traces
 ```
 
-TiKV, once FW1 is on the base: start `test/tikv/up.sh 23790 20260` and run
+TiKV (FW1's store): start the playground and run with the `tikv` feature
 
 ```text
-RUSTFLAGS="--cfg resonate_profile_tikv" TEST_TIKV_PD=127.0.0.1:23790 \
-  cargo test -p resonate-profile --features resonate-server-blob/tikv
+test/tikv/up.sh 23790 20260
+TEST_TIKV_PD=127.0.0.1:23790 cargo test -p resonate-profile --features tikv
+test/tikv/down.sh
 ```
 
 (`TEST_TIKV_KEYSPACE` defaults to `resonate_profile`; each run uses a fresh
-root). It is a `--cfg` and not a feature until FW1 merges, because the
-workspace check builds with `--all-features`.
+root).
 
 Traces: with `TEST_TRACE_DIR`, each scenario writes
 `<scenario>.<store>.ndjson` in the `spec/valid` format (one line per protocol

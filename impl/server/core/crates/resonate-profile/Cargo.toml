@@ -14,19 +14,11 @@ description = "The gateway-facing protocol profile (docs/protocol-profile.md) as
 # object_store into its own test build, and would invert what it is for: the
 # thing the stores are compared against, depending on nothing but the core.
 
-# The TiKV leg is behind `--cfg resonate_profile_tikv`, not a feature: FW1
-# (`fw1/tikv-store`) adds `resonate-server-blob`'s `tikv` feature and the
-# `resonate_server_blob::tikv` module, and until it is on loams/main a feature
-# here could not be wired to it, and the workspace's `--all-features` check
-# would turn it on. With FW1 on the base:
-#
-#   RUSTFLAGS="--cfg resonate_profile_tikv" TEST_TIKV_PD=127.0.0.1:23790 \
-#     cargo test -p resonate-profile --features resonate-server-blob/tikv
-#
-# and the follow-up is to make it a `tikv = ["resonate-server-blob/tikv"]`
-# feature.
-[lints.rust]
-unexpected_cfgs = { level = "warn", check-cfg = ["cfg(resonate_profile_tikv)"] }
+[features]
+# The TiKV leg: the blob server over FW1's TiKV store. Run it with
+#   test/tikv/up.sh 23790 20260
+#   TEST_TIKV_PD=127.0.0.1:23790 cargo test -p resonate-profile --features tikv
+tikv = ["resonate-server-blob/tikv"]
 
 [dependencies]
 resonate-core = { version = "0.10.1", path = "../resonate-core" }

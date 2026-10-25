@@ -15,7 +15,7 @@
 //! | `blob`     | the blob server over an in-memory object store | always |
 //! | `postgres` | the SQL server over Postgres                 | `TEST_POSTGRES_URL` is set |
 //! | `mysql`    | the SQL server over MySQL or TiDB            | `TEST_MYSQL_URL` is set |
-//! | `tikv`     | the blob server over TiKV (FW1)              | `--cfg resonate_profile_tikv` and `TEST_TIKV_PD` (see Cargo.toml) |
+//! | `tikv`     | the blob server over TiKV (FW1)              | feature `tikv` and `TEST_TIKV_PD` |
 //!
 //! `TEST_BACKENDS=sqlite,postgres` keeps only the named stores.
 //!
@@ -146,9 +146,7 @@ impl ResonateServer for OracleServer {
                     address,
                     Message::Execute(ExecuteMsg {
                         kind: "execute".to_string(),
-                        head: MessageHead {
-                            server_url: SERVER_URL.to_string(),
-                        },
+                        head: MessageHead::new(SERVER_URL.to_string()),
                         data: ExecuteMsgData {
                             task: ExecuteMsgTask {
                                 id: task_id,
@@ -161,7 +159,7 @@ impl ResonateServer for OracleServer {
                     address,
                     Message::Unblock(UnblockMsg {
                         kind: "unblock".to_string(),
-                        head: UnblockMsgHead {},
+                        head: UnblockMsgHead::default(),
                         data: UnblockMsgData { promise },
                     }),
                 ),
@@ -316,8 +314,8 @@ async fn blob() -> Backend {
 }
 
 /// The blob server over TiKV, one fresh root per call so runs never share
-/// state. Needs FW1's `resonate_server_blob::tikv`; see Cargo.toml.
-#[cfg(resonate_profile_tikv)]
+/// state. FW1's `resonate_server_blob::tikv`, behind this crate's `tikv` feature.
+#[cfg(feature = "tikv")]
 async fn tikv(pd: String) -> Backend {
     use resonate_server_blob::tikv::{ensure_keyspace, keyspace::pd_http_url};
     use resonate_server_blob::tikv::{TikvStore, TikvStoreCfg};
@@ -344,7 +342,7 @@ async fn tikv(pd: String) -> Backend {
     }
 }
 
-#[cfg(resonate_profile_tikv)]
+#[cfg(feature = "tikv")]
 fn rand_u64() -> u64 {
     use std::hash::{BuildHasher, Hasher};
     let mut h = std::collections::hash_map::RandomState::new().build_hasher();
@@ -387,15 +385,15 @@ pub async fn backends() -> Vec<Backend> {
         Ok(url) if wanted("mysql") => out.push(mysql(url).await),
         _ => {}
     }
-    #[cfg(resonate_profile_tikv)]
+    #[cfg(feature = "tikv")]
     match std::env::var("TEST_TIKV_PD") {
         Ok(pd) if !pd.is_empty() && wanted("tikv") => out.push(tikv(pd).await),
         _ => eprintln!("[profile] TEST_TIKV_PD not set: tikv skipped"),
     }
-    #[cfg(not(resonate_profile_tikv))]
+    #[cfg(not(feature = "tikv"))]
     if std::env::var("TEST_TIKV_PD").is_ok() {
         eprintln!(
-            "[profile] TEST_TIKV_PD is set but this build has no TiKV leg (--cfg resonate_profile_tikv): tikv skipped"
+            "[profile] TEST_TIKV_PD is set but this build has no `tikv` feature: tikv skipped"
         );
     }
     if let Some(w) = &want {
