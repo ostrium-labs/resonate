@@ -107,13 +107,18 @@ pub struct BenchArgs {
     /// Phases to skip: `cs`, `task`, `timer`.
     #[arg(long, value_delimiter = ',')]
     pub skip: Vec<String>,
+    /// Fail the run unless every timer fired and the p99 lateness is under
+    /// this many milliseconds. The regression gate for timer lateness under
+    /// load (FW11); unset, the bench only reports.
+    #[arg(long)]
+    pub max_timer_p99_ms: Option<f64>,
 }
 
 pub async fn bench(backend: BenchBackend, db: &DbArgs, args: &BenchArgs) -> Result<()> {
     if let Some(url) = &args.server_url {
         let report = run_phases(backend, url, args).await?;
         report.print();
-        return Ok(());
+        return report.check(args);
     }
     if backend == BenchBackend::Tikv {
         crate::tikv_pd(db)?;
@@ -175,7 +180,7 @@ pub async fn bench(backend: BenchBackend, db: &DbArgs, args: &BenchArgs) -> Resu
             tokio::runtime::Handle::current().block_on(run_phases(backend, &url, &args))
         })?;
         report.print();
-        Ok(())
+        report.check(&args)
     })
     .await
 }
@@ -716,6 +721,30 @@ fn commit() -> String {
 }
 
 impl Report {
+    /// The `--max-timer-p99-ms` gate: every timer fired, and the p99 under it.
+    fn check(&self, args: &BenchArgs) -> Result<()> {
+        let (Some(bound), Some(t)) = (args.max_timer_p99_ms, &self.timer) else {
+            return Ok(());
+        };
+        if t.fired < t.created {
+            return Err(format!(
+                "timer gate: {} of {} timers fired within {} ms of the last deadline",
+                t.fired, t.created, args.timer_grace_ms
+            ));
+        }
+        let p99 = pct(&t.late_ms, 99.0);
+        if p99.is_nan() || p99 >= bound {
+            return Err(format!(
+                "timer gate: p99 lateness {p99} ms, bound {bound} ms"
+            ));
+        }
+        eprintln!(
+            "timer gate: p99 lateness {p99} ms < {bound} ms, all {} fired",
+            t.fired
+        );
+        Ok(())
+    }
+
     fn json(&self) -> Value {
         let mut v = json!({
             "bench": "resonate",
