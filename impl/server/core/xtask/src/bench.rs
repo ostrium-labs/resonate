@@ -38,8 +38,8 @@ pub enum BenchBackend {
     Mysql,
     Tidb,
     Blob,
-    /// The blob server over TiKV. Not in this build yet (FW1): bench a server
-    /// that is already running with `--server-url`.
+    /// The blob server over TiKV (`resonate-server-tikv`), on the cluster
+    /// `--tikv-pd` names, under a fresh root.
     Tikv,
 }
 
@@ -62,7 +62,7 @@ impl BenchBackend {
             BenchBackend::Mysql => Some(Backend::Mysql),
             BenchBackend::Tidb => Some(Backend::Tidb),
             BenchBackend::Blob => Some(Backend::Blob),
-            BenchBackend::Tikv => None,
+            BenchBackend::Tikv => Some(Backend::Tikv),
         }
     }
 }
@@ -114,6 +114,9 @@ pub async fn bench(backend: BenchBackend, db: &DbArgs, args: &BenchArgs) -> Resu
         let report = run_phases(backend, url, args).await?;
         report.print();
         return Ok(());
+    }
+    if backend == BenchBackend::Tikv {
+        crate::tikv_pd(db)?;
     }
     let Some(kind) = backend.backend() else {
         return Err(format!(

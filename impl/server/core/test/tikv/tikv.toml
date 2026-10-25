@@ -1,0 +1,9 @@
+# TiKV for Resonate's TiKV store: API v2 (keyspaces), which needs TTL.
+memory-usage-limit = "2GB"
+
+[storage]
+api-version = 2
+enable-ttl = true
+
+[storage.block-cache]
+capacity = "512MB"

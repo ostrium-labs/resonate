@@ -1,0 +1,4 @@
+# PD for Resonate's TiKV store. The store creates its keyspace through PD's
+# HTTP API when it is missing, so nothing is pre-allocated here.
+[replication]
+max-replicas = 1

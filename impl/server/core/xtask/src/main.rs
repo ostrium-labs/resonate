@@ -123,6 +123,10 @@ enum Backend {
     Tidb,
     Blob,
     Neo4j,
+    /// The blob server on TiKV (`resonate-server-tikv`): PD from
+    /// `--tikv-pd`; every run works under a fresh root, so one cluster
+    /// serves any number of runs.
+    Tikv,
 }
 
 #[derive(Args, Clone)]
@@ -145,6 +149,13 @@ struct DbArgs {
     neo4j_user: String,
     #[arg(long, env = "XTASK_NEO4J_PASSWORD", default_value = "resonate")]
     neo4j_password: String,
+    /// PD of a TiKV cluster on API v2 (`host:port[,host:port]`), for the
+    /// tikv backend. `test/tikv/up.sh` starts one.
+    #[arg(long, env = "XTASK_TIKV_PD")]
+    tikv_pd: Option<String>,
+    /// The keyspace the tikv backend works in; created if missing.
+    #[arg(long, env = "XTASK_TIKV_KEYSPACE", default_value = "resonate_xtask")]
+    tikv_keyspace: String,
     /// Leave the fresh databases in place after the run, for inspection.
     #[arg(long)]
     keep_db: bool,
@@ -158,9 +169,13 @@ struct PorcArgs {
     /// Concurrent clients the recorder runs.
     #[arg(long, default_value_t = 8)]
     clients: u32,
-    /// Operations per client.
+    /// Operations in the whole run, shared by the clients (conctrace's
+    /// `--ops` is a total, not a per-client count).
     #[arg(long, default_value_t = 600)]
     ops: u32,
+    /// The recorder's seed: a different seed walks different operations.
+    #[arg(long, default_value_t = 1)]
+    seed: u64,
 }
 
 #[tokio::main]
@@ -325,7 +340,7 @@ impl FreshDb {
                     .await
                     .map_err(|e| format!("create database {name}: {e}"))?;
             }
-            Backend::Sqlite | Backend::Blob | Backend::Neo4j => {
+            Backend::Sqlite | Backend::Blob | Backend::Neo4j | Backend::Tikv => {
                 unreachable!("no server to create a database on")
             }
         }
@@ -375,7 +390,7 @@ impl FreshDb {
                     .map_err(|e| e.to_string()),
                 Err(e) => Err(e),
             },
-            Backend::Sqlite | Backend::Blob => Ok(()),
+            Backend::Sqlite | Backend::Blob | Backend::Tikv => Ok(()),
         };
         match dropped {
             Ok(()) => eprintln!("==> dropped database {}", self.name),
@@ -434,8 +449,15 @@ fn admin_url(db: &DbArgs, backend: Backend) -> Result<Option<String>> {
                 .clone()
                 .ok_or("neo4j needs --neo4j-uri or XTASK_NEO4J_URI")?,
         ),
-        Backend::Sqlite | Backend::Blob => None,
+        Backend::Sqlite | Backend::Blob | Backend::Tikv => None,
     })
+}
+
+/// PD for the tikv backend, or why there is none.
+fn tikv_pd(db: &DbArgs) -> Result<String> {
+    db.tikv_pd
+        .clone()
+        .ok_or_else(|| "tikv needs --tikv-pd or XTASK_TIKV_PD (test/tikv/up.sh starts one)".into())
 }
 
 /// Run `job` against a fresh database for `backend`, then drop it.
@@ -461,7 +483,7 @@ fn url_var(backend: Backend) -> Option<&'static str> {
         Backend::Postgres => Some("TEST_POSTGRES_URL"),
         Backend::Mysql | Backend::Tidb => Some("TEST_MYSQL_URL"),
         Backend::Neo4j => Some("TEST_NEO4J_URI"),
-        Backend::Sqlite | Backend::Blob => None,
+        Backend::Sqlite | Backend::Blob | Backend::Tikv => None,
     }
 }
 
@@ -508,6 +530,34 @@ fn with_seed(cmd: &mut Command, seed: Option<u64>) -> &mut Command {
 }
 
 async fn one_differential(backend: Backend, seed: Option<u64>, db: &DbArgs) -> Result<()> {
+    if backend == Backend::Tikv {
+        // The blob server's own differential with its store on TiKV (each
+        // run under a fresh root), then the store contract and the TiKV
+        // tests: layout, isolation, restart and the Loams 0.1.x fixture.
+        let pd = tikv_pd(db)?;
+        for test in ["differential", "store_contract", "tikv"] {
+            let mut cmd = cargo();
+            cmd.args([
+                "test",
+                "--release",
+                "-p",
+                "resonate-server-blob",
+                "--features",
+                "tikv",
+                "--test",
+                test,
+                "--",
+                "--nocapture",
+            ])
+            .env("TEST_TIKV_PD", &pd)
+            .env("TEST_TIKV_KEYSPACE", &db.tikv_keyspace);
+            run(
+                &format!("blob {test} on TiKV {pd}"),
+                with_seed(&mut cmd, seed),
+            )?;
+        }
+        return Ok(());
+    }
     if backend == Backend::Blob {
         // The engine port is the SQL family's; blob has its own differential,
         // against its in-crate model, and is in every port differential —
@@ -687,11 +737,40 @@ fn server_env(server: &mut Command, backend: Backend, url: Option<&str>, db: &Db
                 dir.join("resonate.db"),
             );
         }
+        Backend::Tikv => {
+            // A fresh root per run: one cluster serves any number of runs.
+            // The caller checked `--tikv-pd` (`tikv_pd`).
+            let pd = db
+                .tikv_pd
+                .as_deref()
+                .unwrap_or_default()
+                .split(',')
+                .map(|p| format!("{p:?}"))
+                .collect::<Vec<_>>()
+                .join(",");
+            let root = format!(
+                "xtask-{}-{}/",
+                std::process::id(),
+                SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .map(|d| d.as_millis())
+                    .unwrap_or(0)
+            );
+            eprintln!("==> TiKV root {root} in keyspace {}", db.tikv_keyspace);
+            server
+                .env("RESONATE_SERVERS__ACTIVE", "server_tikv")
+                .env("RESONATE_SERVERS__SERVER_TIKV__PD", format!("[{pd}]"))
+                .env("RESONATE_SERVERS__SERVER_TIKV__KEYSPACE", &db.tikv_keyspace)
+                .env("RESONATE_SERVERS__SERVER_TIKV__ROOT", root);
+        }
     }
 }
 
 async fn porcupine(backend: Backend, db: &DbArgs, porc: &PorcArgs) -> Result<()> {
     let spec = spec_dir(porc)?;
+    if backend == Backend::Tikv {
+        tikv_pd(db)?;
+    }
     if Command::new("go").arg("version").output().is_err() {
         return Err("the linearizability check needs `go` on PATH".into());
     }
@@ -760,6 +839,8 @@ async fn porcupine(backend: Backend, db: &DbArgs, porc: &PorcArgs) -> Result<()>
                     &porc.clients.to_string(),
                     "--ops",
                     &porc.ops.to_string(),
+                    "--seed",
+                    &porc.seed.to_string(),
                 ]),
         )?;
         let history = std::fs::File::open(dir.join("trace.history"))
@@ -801,6 +882,11 @@ async fn all(db: &DbArgs, porc: &PorcArgs) -> Result<()> {
         servers.push(Backend::Neo4j);
     } else {
         eprintln!("==> no neo4j uri: neo4j skipped");
+    }
+    if db.tikv_pd.is_some() {
+        servers.push(Backend::Tikv);
+    } else {
+        eprintln!("==> no tikv pd: tikv skipped");
     }
     for b in servers.iter().copied().chain([Backend::Blob]) {
         differential(b, &[], db).await?;
