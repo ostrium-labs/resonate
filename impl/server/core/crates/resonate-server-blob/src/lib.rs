@@ -33,6 +33,8 @@ pub mod schedules;
 pub mod sender;
 pub mod server;
 pub mod store;
+#[cfg(feature = "tikv")]
+pub mod tikv;
 pub mod timer_queue;
 pub mod timerd;
 pub mod traced_store;

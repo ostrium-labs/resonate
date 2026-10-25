@@ -1,0 +1,83 @@
+{
+  "source": "ghcr.io/ostrium-labs/loams:0.1.1 (ce8abf380261), loams dev --durable-store tikv://127.0.0.1:23790/loams_durable, root resonate-durable/",
+  "promises": [
+    {
+      "id": "fx-pending",
+      "state": "pending",
+      "param": {
+        "headers": {
+          "h": "1"
+        },
+        "data": "aGVsbG8="
+      },
+      "value": {},
+      "tags": {
+        "app": "fixture"
+      },
+      "timeoutAt": 1824394407717,
+      "createdAt": 1792858407728
+    },
+    {
+      "id": "fx-resolved",
+      "state": "resolved",
+      "param": {
+        "data": "aW4="
+      },
+      "value": {
+        "data": "b3V0"
+      },
+      "tags": {},
+      "timeoutAt": 1824394407717,
+      "createdAt": 1792858408089,
+      "settledAt": 1792858408112
+    },
+    {
+      "id": "fx-rejected",
+      "state": "rejected",
+      "param": {},
+      "value": {
+        "data": "ZXJy"
+      },
+      "tags": {},
+      "timeoutAt": 1824394407717,
+      "createdAt": 1792858408142,
+      "settledAt": 1792858408165
+    },
+    {
+      "id": "fx-timeout",
+      "state": "rejected_timedout",
+      "param": {},
+      "value": {},
+      "tags": {},
+      "timeoutAt": 1792858408717,
+      "createdAt": 1792858408189,
+      "settledAt": 1792858408717
+    },
+    {
+      "id": "fx-timer",
+      "state": "resolved",
+      "param": {},
+      "value": {},
+      "tags": {
+        "resonate:timer": "true"
+      },
+      "timeoutAt": 1792858408717,
+      "createdAt": 1792858408208,
+      "settledAt": 1792858408717
+    },
+    {
+      "id": "fx-task",
+      "state": "pending",
+      "param": {
+        "data": "e30="
+      },
+      "value": {},
+      "tags": {
+        "resonate:target": "poll://any@fixture"
+      },
+      "timeoutAt": 1824394407717,
+      "createdAt": 1792858408251
+    }
+  ],
+  "settle": "fx-pending"
+}
