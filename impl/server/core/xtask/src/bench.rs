@@ -624,9 +624,10 @@ async fn timers(client: &Client, run: &str, args: &BenchArgs) -> Result<Timers> 
     let per_client = args.timers.div_ceil(args.clients.max(1));
     let mut handles = Vec::new();
     for c in 0..args.clients {
-        let (client, deadlines, group, run) = (
+        let (client, deadlines, late, group, run) = (
             client.clone(),
             Arc::clone(&deadlines),
+            Arc::clone(&late),
             group.clone(),
             run.to_string(),
         );
@@ -655,10 +656,23 @@ async fn timers(client: &Client, run: &str, args: &BenchArgs) -> Result<Timers> 
                         json!({"awaited": id, "address": format!("poll://any@{group}")}),
                     )
                     .await;
-                if matches!(r, Ok((200, _))) {
-                    created += 1;
-                } else {
-                    deadlines.lock().unwrap().remove(&id);
+                match r {
+                    Ok((200, data)) => {
+                        created += 1;
+                        // A deadline that passed before the listener landed
+                        // is answered here, settled, and no listener is kept,
+                        // so no unblock will follow. This answer is when the
+                        // client learned of it.
+                        if data["promise"]["state"] == "rejected_timedout" {
+                            let arrived = now_ms();
+                            if let Some(d) = deadlines.lock().unwrap().remove(&id) {
+                                late.lock().unwrap().push((arrived - d) as f64);
+                            }
+                        }
+                    }
+                    _ => {
+                        deadlines.lock().unwrap().remove(&id);
+                    }
                 }
             }
             created
