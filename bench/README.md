@@ -19,5 +19,4 @@ The workloads (same shape for every system):
 - **burst**: N one-step workflows started at once, then awaited.
 
 Each run writes `runs/<run-id>/` with `workflows.csv`, `steps.csv`, `requests.csv`, `resources.csv`
-(CPU and RSS of each process or container, 1 s samples), `env.json` (host load at start and end), `summary.json`
-and Goose's HTML report. See `results/2026-10-24/README.md` for the first full run.
+(CPU and RSS of each process or container, 1 s samples), `env.json` (host load at start and end), and `summary.json`. See `results/2026-10-24/README.md` for the first full run.

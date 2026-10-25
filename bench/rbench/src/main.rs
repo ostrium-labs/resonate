@@ -295,7 +295,8 @@ async fn goose_attack(
         .set_default(GooseDefault::Host, host)?
         .set_default(GooseDefault::Users, users)?
         .set_default(GooseDefault::HatchRate, hatch.as_str())?
-        .set_default(GooseDefault::NoPrintMetrics, true)?
+        // Goose's own metrics go to stderr's log and its HTML report; rbench's
+        // records are the results.
         .set_default(GooseDefault::ReportFile, report.to_str().unwrap())?
         .execute()
         .await?;

@@ -15,16 +15,25 @@ const { chromium } = require(process.env.PLAYWRIGHT_CORE || "playwright-core");
   fs.mkdirSync(out, { recursive: true });
   const browser = await chromium.launch();
   const page = await browser.newPage({ viewport: { width: 1600, height: 1000 }, colorScheme: "light" });
-  await page.goto(`${base}/login`, { waitUntil: "networkidle" });
-  await page.fill('input[type="email"], input#email, input[name="email"]', email);
-  const next = page.getByRole("button", { name: /next|continue/i });
-  if (await next.count()) await next.first().click();
-  await page.waitForSelector('input[type="password"]', { timeout: 20000 });
-  await page.fill('input[type="password"]', password);
-  await page.getByRole("button", { name: /login|sign in|log in/i }).first().click();
-  await page.waitForLoadState("networkidle");
+  async function login() {
+    await page.goto(`${base}/login`, { waitUntil: "networkidle" });
+    await page.fill('input[type="email"], input#email, input[name="email"]', email);
+    const next = page.getByRole("button", { name: /next|continue/i });
+    if (await next.count()) await next.first().click();
+    await page.waitForSelector('input[type="password"]', { timeout: 30000 });
+    await page.fill('input[type="password"]', password);
+    await page.getByRole("button", { name: /login|sign in|log in/i }).first().click();
+    await page.waitForURL((u) => !u.toString().includes("/login"), { timeout: 60000 });
+    await page.waitForLoadState("networkidle");
+  }
+  await login();
   for (const s of spec) {
+    await page.setViewportSize(s.viewport || { width: 1600, height: 1000 });
     await page.goto(`${base}${s.path}`, { waitUntil: "networkidle" });
+    if (page.url().includes("/login")) {
+      await login();
+      await page.goto(`${base}${s.path}`, { waitUntil: "networkidle" });
+    }
     await page.waitForTimeout(s.wait || 4000);
     const file = path.join(out, `${s.name}.png`);
     await page.screenshot({ path: file, fullPage: false });

@@ -44,8 +44,28 @@ def load(d):
         return list(csv.DictReader(f))
 
 
+NAMES = {"resonate": "Resonate", "loams-durable": "Loams /durable/", "temporal": "Temporal", "airflow": "Airflow"}
+
+
 def label(r):
-    return f"{r['system']} · {r['backend']}"
+    be = r["backend"]
+    if r["system"] == "resonate" and be == "tikv":
+        be = "TiKV (FW1)"
+    return f"{NAMES.get(r['system'], r['system'])} · {be}"
+
+
+def headline(d):
+    """Primary runs from headline-runs.txt (lines without a trailing comment)."""
+    p = os.path.join(d, "headline-runs.txt")
+    if not os.path.exists(p):
+        return None
+    keep = set()
+    for line in open(p):
+        if line.startswith("#") or "#" in line:
+            continue
+        if line.strip():
+            keep.add(line.strip())
+    return keep
 
 
 def best(rows):
@@ -57,7 +77,7 @@ def best(rows):
 
 
 def bars(rows, workload, out):
-    rs = sorted([r for r in rows if r["workload"] == workload], key=lambda r: float(r["throughput_wf_s"]))
+    rs = sorted([r for r in rows if r["workload"] == workload and not r["backend"].startswith("tidb")], key=lambda r: float(r["throughput_wf_s"]))
     if not rs:
         return
     h = 0.9 + 0.32 * len(rs)
@@ -81,7 +101,7 @@ def bars(rows, workload, out):
 
 
 def latency(rows, workload, out):
-    rs = sorted([r for r in rows if r["workload"] == workload], key=lambda r: float(r["p50_ms"]))
+    rs = sorted([r for r in rows if r["workload"] == workload and not r["backend"].startswith("tidb")], key=lambda r: float(r["p50_ms"]))
     if not rs:
         return
     h = 1.1 + 0.32 * len(rs)
@@ -141,7 +161,9 @@ def main():
     d = sys.argv[1]
     out = os.path.join(d, "charts")
     os.makedirs(out, exist_ok=True)
-    rows = best(load(d))
+    keep = headline(d)
+    rows = load(d)
+    rows = [r for r in rows if r["run_id"] in keep] if keep else best(rows)
     for w in ("fanout", "chain", "burst"):
         bars(rows, w, out)
         latency(rows, w, out)

@@ -76,3 +76,23 @@ services:
     volumes:
       - ${RBENCH_DATA:?set RBENCH_DATA}/loams:/var/lib/loams
     depends_on: [tikv]
+
+  # With the profile `tidb`: TiDB v8.5.8 (the Loams build, keyspace mode, the
+  # image the Loams release stack pins) on this TiKV, on 127.0.0.1:14000. The
+  # bench uses it only to read Request Units from statements_summary, which
+  # TiDB Cloud Starter does not let a user read.
+  tidb:
+    profiles: [tidb]
+    image: ghcr.io/ostrium-labs/tidb:v8.5.8-loams.1@sha256:ea62f135814fef2d9d89bb659f1b70b63d7eecb6f2ba61edf53482f29089a954
+    container_name: rbench-tidb
+    network_mode: host
+    command:
+      - --store=tikv
+      - --path=127.0.0.1:2379
+      - --config=/etc/tidb.toml
+      - --host=127.0.0.1
+      - -P=14000
+      - --status=14080
+    volumes:
+      - ./tidb.toml:/etc/tidb.toml:ro
+    depends_on: [tikv]

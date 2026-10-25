@@ -12,8 +12,8 @@ WORKLOADS=${WORKLOADS:-fanout chain burst}
 mkdir -p "$OUT/runs" "$LOGS"
 watch=()
 for c in api-server scheduler dag-processor triggerer edge-worker-1 edge-worker-2 postgres; do watch+=(--watch "container:rbench-airflow-$c"); done
-common=(--system airflow --backend postgres --out "$OUT/runs" "${watch[@]}" --watch proc:rbench --timeout-s 1800
-  --note "Airflow 3.3.2 + edge3 4.3.2 (EdgeExecutor, 2 workers x 16 slots), one scheduler, Postgres 17.10 metadata DB on ext4 (/mnt/Projects); run end observed by polling every 100 ms")
+common=(--system airflow --backend postgres --out "$OUT/runs" "${watch[@]}" --watch proc:rbench --timeout-s 3600 --poll-ms "${POLL_MS:-1000}"
+  --note "Airflow 3.3.2 + edge3 4.3.2 (EdgeExecutor, 2 workers x 16 slots), one scheduler, Postgres 17.10 metadata DB on ext4 (/mnt/Projects); run end observed by polling each run every ${POLL_MS:-1000} ms")
 for w in $WORKLOADS; do
   case $w in
   fanout) args=(-n "$FAN_N" -c "$FAN_C" -k "$FAN_K") ;;

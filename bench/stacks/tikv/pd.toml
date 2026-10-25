@@ -1,2 +1,2 @@
 [keyspace]
-pre-alloc = ["loams_durable", "resonate_bench"]
+pre-alloc = ["loams_durable", "resonate_bench", "rbench_sql"]

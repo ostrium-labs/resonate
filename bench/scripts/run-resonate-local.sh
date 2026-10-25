@@ -30,7 +30,11 @@ postgres)
   podman exec rbench-pg psql -U resonate -d postgres -qc 'DROP DATABASE IF EXISTS resonate' -c 'CREATE DATABASE resonate' >/dev/null
   storeenv=(RESONATE_SERVERS__ACTIVE=server_postgres "RESONATE_SERVERS__SERVER_POSTGRES__URL=postgres://resonate:resonate@127.0.0.1:15432/resonate" "RESONATE_SERVERS__SERVER_POSTGRES__POOL_SIZE=$POOL")
   watch=(--watch container:rbench-pg); note="Postgres 17.10 in podman (rbench-pg), data on ext4 (/mnt/Projects), pool $POOL" ;;
-*) echo "store: sqlite | postgres" >&2; exit 2 ;;
+tikv)
+  # The fork's own TiKV store (FW1, branch fw1/tikv-store) on bench/stacks/tikv (PD + TiKV, up).
+  storeenv=(RESONATE_SERVERS__ACTIVE=server_tikv 'RESONATE_SERVERS__SERVER_TIKV__PD=["127.0.0.1:2379"]' RESONATE_SERVERS__SERVER_TIKV__KEYSPACE=resonate_bench "RESONATE_SERVERS__SERVER_TIKV__ROOT=bench-$(date +%s)/")
+  watch=(--watch container:rbench-tikv-tikv --watch container:rbench-tikv-pd); note="${TIKV_BUILD:-FW1 TiKV store, fw1/tikv-store 4196c06c}, one PD + one TiKV v8.5.8 in podman, API v2 keyspace resonate_bench, data on ext4 (/mnt/Projects)" ;;
+*) echo "store: sqlite | postgres | tikv" >&2; exit 2 ;;
 esac
 
 server=""
@@ -41,6 +45,7 @@ env -i HOME="$HOME" PATH="$PATH" "${storeenv[@]}" \
   OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT:-http://127.0.0.1:4317} \
   OTEL_EXPORTER_OTLP_PROTOCOL=grpc \
   OTEL_SERVICE_NAME=resonate-server \
+  OTEL_SDK_DISABLED=${SERVER_OTEL_OFF:-false} \
   "$SERVER_BIN" serve --level warn >"$LOGS/server-$store.log" 2>&1 &
 server=$!
 for _ in $(seq 1 60); do
@@ -50,7 +55,7 @@ for _ in $(seq 1 60); do
 done
 curl -fsS -o /dev/null http://127.0.0.1:18001/ready
 
-common=(--system resonate --backend "$store" --out "$OUT/runs" --watch "pid:$server" "${watch[@]}" --watch proc:rbench --note "$note")
+common=(--system resonate --backend "$store" --out "$OUT/runs" --watch "pid:$server" "${watch[@]}" --watch proc:rbench --note "$note${SERVER_OTEL_OFF:+; server tracing off (OTEL_SDK_DISABLED=true)}")
 for w in $WORKLOADS; do
   case $w in
   fanout) args=(-n "$FAN_N" -c "$FAN_C" -k "$FAN_K") ;;
