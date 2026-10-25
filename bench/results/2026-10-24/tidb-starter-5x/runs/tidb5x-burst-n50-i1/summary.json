@@ -1,0 +1,85 @@
+{
+  "run_id": "tidb5x-burst-n50-i1",
+  "system": "resonate",
+  "backend": "tidb5x-aws-ap-southeast-1-i1",
+  "workload": "burst",
+  "params": {
+    "concurrency": 50,
+    "n": 50,
+    "wake": "push"
+  },
+  "started": 50,
+  "completed": 50,
+  "failed": 0,
+  "retries": 0,
+  "wall_s": 13.816646206,
+  "throughput_wf_s": 3.618823211836101,
+  "latency": {
+    "n": 50,
+    "mean_ms": 10249.96510752,
+    "p50_ms": 10552.546968,
+    "p95_ms": 12069.731072,
+    "p99_ms": 13758.225293,
+    "max_ms": 13758.225293
+  },
+  "steps": {
+    "activity": {
+      "n": 50,
+      "mean_ms": 3933.8724832199996,
+      "p50_ms": 3672.096395,
+      "p95_ms": 6049.846442,
+      "p99_ms": 7765.823409,
+      "max_ms": 7765.823409
+    }
+  },
+  "sleep_lateness": null,
+  "requests": {
+    "task.create": {
+      "n": 50,
+      "mean_ms": 2976.33887454,
+      "p50_ms": 2928.116373,
+      "p95_ms": 3196.120659,
+      "p99_ms": 3667.905859,
+      "max_ms": 3667.905859
+    },
+    "task.fence(promise.create)": {
+      "n": 50,
+      "mean_ms": 1584.2263925999998,
+      "p50_ms": 1365.188771,
+      "p95_ms": 3281.922037,
+      "p99_ms": 3845.924519,
+      "max_ms": 3845.924519
+    },
+    "task.fence(promise.settle)": {
+      "n": 50,
+      "mean_ms": 2349.55991528,
+      "p50_ms": 2246.862397,
+      "p95_ms": 2844.91188,
+      "p99_ms": 3919.838035,
+      "max_ms": 3919.838035
+    },
+    "task.fulfill": {
+      "n": 50,
+      "mean_ms": 3324.1572625,
+      "p50_ms": 3369.852715,
+      "p95_ms": 4264.993179,
+      "p99_ms": 4506.303512,
+      "max_ms": 4506.303512
+    }
+  },
+  "request_errors": 0,
+  "errors": {},
+  "resources": [
+    {
+      "target": "pid:1081179",
+      "cpu_avg_pct": 2.3330670056418374,
+      "cpu_max_pct": 6.999382556467164,
+      "rss_avg_mb": 43.60885416666667,
+      "rss_max_mb": 45.50390625,
+      "samples": 15
+    }
+  ],
+  "notes": [
+    "5 Starter instances at once (aws-ap-southeast-1), instance 1 of 5, pool 64; step n50"
+  ]
+}

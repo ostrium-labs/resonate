@@ -1,0 +1,96 @@
+{
+  "run_id": "tidb5x-burst-p256-n1000-i2",
+  "system": "resonate",
+  "backend": "tidb5x-aws-ap-southeast-1-i2",
+  "workload": "burst",
+  "params": {
+    "concurrency": 1000,
+    "n": 1000,
+    "wake": "push"
+  },
+  "started": 1000,
+  "completed": 993,
+  "failed": 7,
+  "retries": 0,
+  "wall_s": 84.906078924,
+  "throughput_wf_s": 11.695275680894898,
+  "latency": {
+    "n": 993,
+    "mean_ms": 78819.69634235246,
+    "p50_ms": 79072.741034,
+    "p95_ms": 84628.230681,
+    "p99_ms": 84841.932241,
+    "max_ms": 84866.807215
+  },
+  "steps": {
+    "activity": {
+      "n": 993,
+      "mean_ms": 41953.72280538368,
+      "p50_ms": 41637.755874,
+      "p95_ms": 44831.898173,
+      "p99_ms": 47321.123471,
+      "max_ms": 50161.906311
+    }
+  },
+  "sleep_lateness": null,
+  "requests": {
+    "task.create": {
+      "n": 1000,
+      "mean_ms": 20504.529015919998,
+      "p50_ms": 19761.357962,
+      "p95_ms": 28813.538835,
+      "p99_ms": 29326.653463,
+      "max_ms": 29497.728479
+    },
+    "task.fence(promise.create)": {
+      "n": 1000,
+      "mean_ms": 22440.561199777,
+      "p50_ms": 22366.189223,
+      "p95_ms": 25399.597653,
+      "p99_ms": 28770.971409,
+      "max_ms": 37106.014004
+    },
+    "task.fence(promise.settle)": {
+      "n": 994,
+      "mean_ms": 19521.537350169016,
+      "p50_ms": 19386.786185,
+      "p95_ms": 21866.924244,
+      "p99_ms": 22150.572567,
+      "max_ms": 25548.312453
+    },
+    "task.fulfill": {
+      "n": 993,
+      "mean_ms": 16334.097818220544,
+      "p50_ms": 16678.858061,
+      "p95_ms": 18444.34829,
+      "p99_ms": 18843.00759,
+      "max_ms": 20485.583287
+    },
+    "task.heartbeat": {
+      "n": 995,
+      "mean_ms": 16883.910985921608,
+      "p50_ms": 16958.657461,
+      "p95_ms": 19571.433509,
+      "p99_ms": 19790.544291,
+      "max_ms": 19802.570569
+    }
+  },
+  "request_errors": 7,
+  "errors": {
+    "fence create 500: Internal error: Storage error: error communicating with databa": 6,
+    "fence settle 500: Internal error: Storage error: error communicating with databa": 1
+  },
+  "resources": [
+    {
+      "target": "pid:1153599",
+      "cpu_avg_pct": 8.417509439116385,
+      "cpu_max_pct": 24.99774150405059,
+      "rss_avg_mb": 131.33123319892474,
+      "rss_max_mb": 170.625,
+      "samples": 93
+    }
+  ],
+  "notes": [
+    "5 Starter instances at once (aws-ap-southeast-1), instance 2 of 5, pool 256; step p256-n1000"
+  ]
+}

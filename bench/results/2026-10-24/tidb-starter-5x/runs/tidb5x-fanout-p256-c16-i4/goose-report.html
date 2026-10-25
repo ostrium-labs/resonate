@@ -1,0 +1,1106 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Goose Attack Report</title>
+    <style>
+        .container {
+            width: 1000px;
+            margin: 0 auto;
+            padding: 10px;
+            background: #173529;
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 14px;
+            color: #fff;
+        }
+
+        .info span{
+            color: #b3c3bc;
+        }
+
+        table {
+            border-collapse: collapse;
+            text-align: center;
+            width: 100%;
+        }
+
+        td, th {
+            border: 1px solid #cad9ea;
+            color: #666;
+            height: 30px;
+        }
+
+        thead th {
+            background-color: #cce8eb;
+            width: 100px;
+        }
+
+        tr:nth-child(odd) {
+            background: #fff;
+        }
+
+        tr:nth-child(even) {
+            background: #f5fafa;
+        }
+
+        .charts-container .chart {
+            width: 100%;
+            height: 350px;
+            margin-bottom: 30px;
+        }
+
+        .download {
+            float: right;
+        }
+
+        .download a {
+            color: #00ca5a;
+        }
+
+        .graph {
+            margin-bottom: 1em;
+        }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.2.2/dist/echarts.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <h1>Goose Attack Report</h1>
+
+        <div class="info">
+            <p>Users: <span>16</span> </p>
+            <p>Target Host: <span>http://127.0.0.1:18024/</span></p>
+            <p><span><small><em>goose v0.18.1</em></small></span></p>
+            <h2>Plan overview</h2>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Action</th>
+                            <th>Started</th>
+                            <th>Stopped</th>
+                            <th>Elapsed</th>
+                            <th>Users</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>Increasing</td><td>26-10-25 19:08:31</td><td>26-10-25 19:08:31</td><td>00:00:00</td><td>0 &rarr; 16</td></tr><tr><td>Maintaining</td><td>26-10-25 19:08:31</td><td>26-10-25 19:11:26</td><td>00:02:55</td><td>16</td></tr><tr><td>Canceling</td><td>26-10-25 19:11:26</td><td>26-10-25 19:11:26</td><td>00:00:00</td><td>0 &larr; 16</td></tr>
+                    </tbody>
+                </table>
+        </div>
+
+        <div class="requests">
+            <h2>Request Metrics</h2>
+
+            <div class="graph">
+                <div id="graph-rps" style="width: 1000px; height:500px; background: white;"></div>
+
+                <script type="text/javascript">
+                    var chartDom = document.getElementById('graph-rps');
+                    var myChart = echarts.init(chartDom);
+
+                    myChart.setOption({
+                        color: ['#2c664f', '#5470c6', '#91cc75', '#fac858', '#ee6666', '#73c0de', '#3ba272', '#fc8452', '#9a60b4', '#ea7ccc'],
+                        tooltip: { trigger: 'axis' },
+                        toolbox: {
+                            feature: {
+                                dataZoom: { yAxisIndex: 'none' },
+                                restore: {},
+                                saveAsImage: {}
+                            }
+                        },
+                        dataZoom: [
+                            {
+                                type: 'inside',
+                                start: 0,
+                                end: 100,
+                                fillerColor: 'rgba(34, 80, 61, 0.25)',
+                                selectedDataBackground: {
+                                    lineStyle: { color: '#2c664f' },
+                                    areaStyle: { color: '#378063' }
+                                }
+                            },
+                            {
+                                start: 0,
+                                end: 100,
+                                fillerColor: 'rgba(34, 80, 61, 0.25)',
+                                selectedDataBackground: {
+                                    lineStyle: { color: '#2c664f' },
+                                    areaStyle: { color: '#378063' }
+                                }
+                            },
+                        ],
+                        xAxis: { type: 'time' },
+                        yAxis: {
+                            name: 'Requests #',
+                            nameLocation: 'center',
+                            nameRotate: 90,
+                            nameGap: 45,
+                            type: 'value'
+                        },
+                        legend: {
+                            type: 'plain',
+                            width: '75%',
+                            data: ["Total","POST task.create","POST task.fulfill"],
+                        },
+                        series: [
+                            {
+                                name: 'Total',
+                                type: 'line',
+                                symbol: 'none',
+                                sampling: 'lttb',
+                                lineStyle: { color: '#2c664f' },
+                                areaStyle: { color: '#378063' },
+                                markArea: {
+                                    data: [
+                                        [
+                            {
+                                xAxis: '2026-10-25 19:08:31',
+                                itemStyle: { borderColor: 'rgba(44, 102, 79, 0.25)', borderWidth: 1 },
+                            },
+                            {
+                                xAxis: '2026-10-25 19:08:31'
+                            }
+                        ],
+                        [
+                            {
+                                xAxis: '2026-10-25 19:08:31',
+                                itemStyle: { color: 'rgba(44, 102, 79, 0.05)' },
+                            },
+                            {
+                                xAxis: '2026-10-25 19:08:31'
+                            }
+                        ],
+                        [
+                            {
+                                xAxis: '2026-10-25 19:08:31',
+                                itemStyle: { borderColor: 'rgba(44, 102, 79, 0.25)', borderWidth: 1 },
+                            },
+                            {
+                                xAxis: '2026-10-25 19:08:31'
+                            }
+                        ],[
+                            {
+                                xAxis: '2026-10-25 19:11:26',
+                                itemStyle: { borderColor: 'rgba(179, 65, 65, 0.25)', borderWidth: 1 },
+                            },
+                            {
+                                xAxis: '2026-10-25 19:11:26'
+                            }
+                        ],
+                        [
+                            {
+                                xAxis: '2026-10-25 19:11:26',
+                                itemStyle: { color: 'rgba(179, 65, 65, 0.05)' },
+                            },
+                            {
+                                xAxis: '2026-10-25 19:11:26'
+                            }
+                        ],
+                        [
+                            {
+                                xAxis: '2026-10-25 19:11:26',
+                                itemStyle: { borderColor: 'rgba(179, 65, 65, 0.25)', borderWidth: 1 },
+                            },
+                            {
+                                xAxis: '2026-10-25 19:11:26'
+                            }
+                        ],
+                                    ]
+                                },
+                                data: [["2026-10-25 19:08:31",16],["2026-10-25 19:10:15",1],["2026-10-25 19:10:17",2],["2026-10-25 19:10:18",2],["2026-10-25 19:10:19",2],["2026-10-25 19:10:20",2],["2026-10-25 19:10:21",7],["2026-10-25 19:10:22",4],["2026-10-25 19:10:23",9],["2026-10-25 19:10:24",2],["2026-10-25 19:10:58",1],["2026-10-25 19:10:59",1],["2026-10-25 19:11:00",2],["2026-10-25 19:11:02",1],["2026-10-25 19:11:03",1],["2026-10-25 19:11:05",2],["2026-10-25 19:11:06",1],["2026-10-25 19:11:08",2],["2026-10-25 19:11:10",1],["2026-10-25 19:11:11",1],["2026-10-25 19:11:15",1],["2026-10-25 19:11:20",1],["2026-10-25 19:11:22",1]],
+                            },
+                            {
+                                name: 'POST task.create',
+                                type: 'line',
+                                symbol: 'none',
+                                sampling: 'lttb',
+                                data: [["2026-10-25 19:08:31",16],["2026-10-25 19:10:17",1],["2026-10-25 19:10:20",1],["2026-10-25 19:10:21",1],["2026-10-25 19:10:22",2],["2026-10-25 19:10:23",9],["2026-10-25 19:10:24",2]],
+                            },
+                        {
+                                name: 'POST task.fulfill',
+                                type: 'line',
+                                symbol: 'none',
+                                sampling: 'lttb',
+                                data: [["2026-10-25 19:10:15",1],["2026-10-25 19:10:17",1],["2026-10-25 19:10:18",2],["2026-10-25 19:10:19",2],["2026-10-25 19:10:20",1],["2026-10-25 19:10:21",6],["2026-10-25 19:10:22",2],["2026-10-25 19:10:58",1],["2026-10-25 19:10:59",1],["2026-10-25 19:11:00",2],["2026-10-25 19:11:02",1],["2026-10-25 19:11:03",1],["2026-10-25 19:11:05",2],["2026-10-25 19:11:06",1],["2026-10-25 19:11:08",2],["2026-10-25 19:11:10",1],["2026-10-25 19:11:11",1],["2026-10-25 19:11:15",1],["2026-10-25 19:11:20",1],["2026-10-25 19:11:22",1]],
+                            },
+                        
+                        ]
+                    });
+                </script>
+            </div>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Method</th>
+                        <th>Name</th>
+                        <th># Requests</th>
+                        <th># Fails</th>
+                        <th>Average (ms)</th>
+                        <th>Min (ms)</th>
+                        <th>Max (ms)</th>
+                        <th>RPS</th>
+                        <th>Failures/s</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+        <td>POST</td>
+        <td>task.create</td>
+        <td>32</td>
+        <td>0</td>
+        <td>8379.97</td>
+        <td>1423</td>
+        <td>16445</td>
+        <td>0.18</td>
+        <td>0.00</td>
+    </tr>
+<tr>
+        <td>POST</td>
+        <td>task.fulfill</td>
+        <td>31</td>
+        <td>1</td>
+        <td>6039.35</td>
+        <td>2107</td>
+        <td>17365</td>
+        <td>0.18</td>
+        <td>0.01</td>
+    </tr>
+<tr>
+        <td></td>
+        <td>Aggregated</td>
+        <td>63</td>
+        <td>1</td>
+        <td>7228.24</td>
+        <td>1423</td>
+        <td>17365</td>
+        <td>0.36</td>
+        <td>0.01</td>
+    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        
+
+        <div class="responses">
+            <h2>Response Time Metrics</h2>
+
+            <div class="graph">
+                <div id="graph-avg-response-time" style="width: 1000px; height:500px; background: white;"></div>
+
+                <script type="text/javascript">
+                    var chartDom = document.getElementById('graph-avg-response-time');
+                    var myChart = echarts.init(chartDom);
+
+                    myChart.setOption({
+                        color: ['#2c664f', '#5470c6', '#91cc75', '#fac858', '#ee6666', '#73c0de', '#3ba272', '#fc8452', '#9a60b4', '#ea7ccc'],
+                        tooltip: { trigger: 'axis' },
+                        toolbox: {
+                            feature: {
+                                dataZoom: { yAxisIndex: 'none' },
+                                restore: {},
+                                saveAsImage: {}
+                            }
+                        },
+                        dataZoom: [
+                            {
+                                type: 'inside',
+                                start: 0,
+                                end: 100,
+                                fillerColor: 'rgba(34, 80, 61, 0.25)',
+                                selectedDataBackground: {
+                                    lineStyle: { color: '#2c664f' },
+                                    areaStyle: { color: '#378063' }
+                                }
+                            },
+                            {
+                                start: 0,
+                                end: 100,
+                                fillerColor: 'rgba(34, 80, 61, 0.25)',
+                                selectedDataBackground: {
+                                    lineStyle: { color: '#2c664f' },
+                                    areaStyle: { color: '#378063' }
+                                }
+                            },
+                        ],
+                        xAxis: { type: 'time' },
+                        yAxis: {
+                            name: 'Response time [ms]',
+                            nameLocation: 'center',
+                            nameRotate: 90,
+                            nameGap: 45,
+                            type: 'value'
+                        },
+                        legend: {
+                            type: 'plain',
+                            width: '75%',
+                            data: ["Total","POST task.create","POST task.fulfill"],
+                        },
+                        series: [
+                            {
+                                name: 'Total',
+                                type: 'line',
+                                symbol: 'none',
+                                sampling: 'lttb',
+                                lineStyle: { color: '#2c664f' },
+                                areaStyle: { color: '#378063' },
+                                markArea: {
+                                    data: [
+                                        [
+                            {
+                                xAxis: '2026-10-25 19:08:31',
+                                itemStyle: { borderColor: 'rgba(44, 102, 79, 0.25)', borderWidth: 1 },
+                            },
+                            {
+                                xAxis: '2026-10-25 19:08:31'
+                            }
+                        ],
+                        [
+                            {
+                                xAxis: '2026-10-25 19:08:31',
+                                itemStyle: { color: 'rgba(44, 102, 79, 0.05)' },
+                            },
+                            {
+                                xAxis: '2026-10-25 19:08:31'
+                            }
+                        ],
+                        [
+                            {
+                                xAxis: '2026-10-25 19:08:31',
+                                itemStyle: { borderColor: 'rgba(44, 102, 79, 0.25)', borderWidth: 1 },
+                            },
+                            {
+                                xAxis: '2026-10-25 19:08:31'
+                            }
+                        ],[
+                            {
+                                xAxis: '2026-10-25 19:11:26',
+                                itemStyle: { borderColor: 'rgba(179, 65, 65, 0.25)', borderWidth: 1 },
+                            },
+                            {
+                                xAxis: '2026-10-25 19:11:26'
+                            }
+                        ],
+                        [
+                            {
+                                xAxis: '2026-10-25 19:11:26',
+                                itemStyle: { color: 'rgba(179, 65, 65, 0.05)' },
+                            },
+                            {
+                                xAxis: '2026-10-25 19:11:26'
+                            }
+                        ],
+                        [
+                            {
+                                xAxis: '2026-10-25 19:11:26',
+                                itemStyle: { borderColor: 'rgba(179, 65, 65, 0.25)', borderWidth: 1 },
+                            },
+                            {
+                                xAxis: '2026-10-25 19:11:26'
+                            }
+                        ],
+                                    ]
+                                },
+                                data: [["2026-10-25 19:08:31",14147.8115234375],["2026-10-25 19:10:15",5384.0],["2026-10-25 19:10:17",4283.0],["2026-10-25 19:10:18",3240.5],["2026-10-25 19:10:19",4082.5],["2026-10-25 19:10:20",2388.5],["2026-10-25 19:10:21",2238.571533203125],["2026-10-25 19:10:22",1783.25],["2026-10-25 19:10:23",2823.222412109375],["2026-10-25 19:10:24",3125.5],["2026-10-25 19:10:58",3489.0],["2026-10-25 19:10:59",4687.0],["2026-10-25 19:11:00",4260.0],["2026-10-25 19:11:02",4326.0],["2026-10-25 19:11:03",7161.0],["2026-10-25 19:11:05",13188.0],["2026-10-25 19:11:06",17365.0],["2026-10-25 19:11:08",13749.5],["2026-10-25 19:11:10",12496.0],["2026-10-25 19:11:11",12118.0],["2026-10-25 19:11:15",8660.0],["2026-10-25 19:11:20",4905.0],["2026-10-25 19:11:22",3576.0]],
+                            },
+                            {
+                                name: 'POST task.create',
+                                type: 'line',
+                                symbol: 'none',
+                                sampling: 'lttb',
+                                data: [["2026-10-25 19:08:31",14147.8115234375],["2026-10-25 19:10:17",3372.0],["2026-10-25 19:10:20",2148.0],["2026-10-25 19:10:21",1717.0],["2026-10-25 19:10:22",1448.5],["2026-10-25 19:10:23",2823.222412109375],["2026-10-25 19:10:24",3125.5]],
+                            },
+                        {
+                                name: 'POST task.fulfill',
+                                type: 'line',
+                                symbol: 'none',
+                                sampling: 'lttb',
+                                data: [["2026-10-25 19:10:15",5384.0],["2026-10-25 19:10:17",5194.0],["2026-10-25 19:10:18",3240.5],["2026-10-25 19:10:19",4082.5],["2026-10-25 19:10:20",2629.0],["2026-10-25 19:10:21",2325.5],["2026-10-25 19:10:22",2118.0],["2026-10-25 19:10:58",3489.0],["2026-10-25 19:10:59",4687.0],["2026-10-25 19:11:00",4260.0],["2026-10-25 19:11:02",4326.0],["2026-10-25 19:11:03",7161.0],["2026-10-25 19:11:05",13188.0],["2026-10-25 19:11:06",17365.0],["2026-10-25 19:11:08",13749.5],["2026-10-25 19:11:10",12496.0],["2026-10-25 19:11:11",12118.0],["2026-10-25 19:11:15",8660.0],["2026-10-25 19:11:20",4905.0],["2026-10-25 19:11:22",3576.0]],
+                            },
+                        
+                        ]
+                    });
+                </script>
+            </div>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Method</th>
+                        <th>Name</th>
+                        <th>50%ile (ms)</th>
+                        <th>60%ile (ms)</th>
+                        <th>70%ile (ms)</th>
+                        <th>80%ile (ms)</th>
+                        <th>90%ile (ms)</th>
+                        <th>95%ile (ms)</th>
+                        <th>99%ile (ms)</th>
+                        <th>100%ile (ms)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+            <td>POST</td>
+            <td>task.create</td>
+            <td>3,000</td>
+            <td>14,000</td>
+            <td>15,000</td>
+            <td>15,000</td>
+            <td>15,000</td>
+            <td>15,000</td>
+            <td>16,000</td>
+            <td>16,000</td>
+        </tr>
+<tr>
+            <td>POST</td>
+            <td>task.fulfill</td>
+            <td>4,000</td>
+            <td>5,000</td>
+            <td>5,000</td>
+            <td>12,000</td>
+            <td>14,000</td>
+            <td>14,000</td>
+            <td>17,000</td>
+            <td>17,000</td>
+        </tr>
+<tr>
+            <td></td>
+            <td>Aggregated</td>
+            <td>4,000</td>
+            <td>5,000</td>
+            <td>12,000</td>
+            <td>15,000</td>
+            <td>15,000</td>
+            <td>15,000</td>
+            <td>16,000</td>
+            <td>17,000</td>
+        </tr>
+                </tbody>
+            </table>
+        </div>
+
+        
+
+        <div class="status_codes">
+        <h2>Status Code Metrics</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Method</th>
+                    <th colspan="2">Name</th>
+                    <th colspan="3">Status Codes</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+        <td>POST</td>
+        <td colspan="2">task.create</td>
+        <td colspan="3">32 [200]</td>
+    </tr>
+<tr>
+        <td>POST</td>
+        <td colspan="2">task.fulfill</td>
+        <td colspan="3">30 [200], 1 [409]</td>
+    </tr>
+<tr>
+        <td></td>
+        <td colspan="2">Aggregated</td>
+        <td colspan="3">62 [200], 1 [409]</td>
+    </tr>
+            </tbody>
+        </table>
+    </div>
+
+        <div class="transactions">
+        <h2>Transaction Metrics</h2>
+
+        <div class="graph">
+                <div id="graph-tps" style="width: 1000px; height:500px; background: white;"></div>
+
+                <script type="text/javascript">
+                    var chartDom = document.getElementById('graph-tps');
+                    var myChart = echarts.init(chartDom);
+
+                    myChart.setOption({
+                        color: ['#2c664f', '#5470c6', '#91cc75', '#fac858', '#ee6666', '#73c0de', '#3ba272', '#fc8452', '#9a60b4', '#ea7ccc'],
+                        tooltip: { trigger: 'axis' },
+                        toolbox: {
+                            feature: {
+                                dataZoom: { yAxisIndex: 'none' },
+                                restore: {},
+                                saveAsImage: {}
+                            }
+                        },
+                        dataZoom: [
+                            {
+                                type: 'inside',
+                                start: 0,
+                                end: 100,
+                                fillerColor: 'rgba(34, 80, 61, 0.25)',
+                                selectedDataBackground: {
+                                    lineStyle: { color: '#2c664f' },
+                                    areaStyle: { color: '#378063' }
+                                }
+                            },
+                            {
+                                start: 0,
+                                end: 100,
+                                fillerColor: 'rgba(34, 80, 61, 0.25)',
+                                selectedDataBackground: {
+                                    lineStyle: { color: '#2c664f' },
+                                    areaStyle: { color: '#378063' }
+                                }
+                            },
+                        ],
+                        xAxis: { type: 'time' },
+                        yAxis: {
+                            name: 'Transactions #',
+                            nameLocation: 'center',
+                            nameRotate: 90,
+                            nameGap: 45,
+                            type: 'value'
+                        },
+                        
+                        series: [
+                            {
+                                name: 'Total',
+                                type: 'line',
+                                symbol: 'none',
+                                sampling: 'lttb',
+                                lineStyle: { color: '#2c664f' },
+                                areaStyle: { color: '#378063' },
+                                markArea: {
+                                    data: [
+                                        [
+                            {
+                                xAxis: '2026-10-25 19:08:31',
+                                itemStyle: { borderColor: 'rgba(44, 102, 79, 0.25)', borderWidth: 1 },
+                            },
+                            {
+                                xAxis: '2026-10-25 19:08:31'
+                            }
+                        ],
+                        [
+                            {
+                                xAxis: '2026-10-25 19:08:31',
+                                itemStyle: { color: 'rgba(44, 102, 79, 0.05)' },
+                            },
+                            {
+                                xAxis: '2026-10-25 19:08:31'
+                            }
+                        ],
+                        [
+                            {
+                                xAxis: '2026-10-25 19:08:31',
+                                itemStyle: { borderColor: 'rgba(44, 102, 79, 0.25)', borderWidth: 1 },
+                            },
+                            {
+                                xAxis: '2026-10-25 19:08:31'
+                            }
+                        ],[
+                            {
+                                xAxis: '2026-10-25 19:11:26',
+                                itemStyle: { borderColor: 'rgba(179, 65, 65, 0.25)', borderWidth: 1 },
+                            },
+                            {
+                                xAxis: '2026-10-25 19:11:26'
+                            }
+                        ],
+                        [
+                            {
+                                xAxis: '2026-10-25 19:11:26',
+                                itemStyle: { color: 'rgba(179, 65, 65, 0.05)' },
+                            },
+                            {
+                                xAxis: '2026-10-25 19:11:26'
+                            }
+                        ],
+                        [
+                            {
+                                xAxis: '2026-10-25 19:11:26',
+                                itemStyle: { borderColor: 'rgba(179, 65, 65, 0.25)', borderWidth: 1 },
+                            },
+                            {
+                                xAxis: '2026-10-25 19:11:26'
+                            }
+                        ],
+                                    ]
+                                },
+                                data: [["2026-10-25 19:08:31",16],["2026-10-25 19:10:17",1],["2026-10-25 19:10:20",1],["2026-10-25 19:10:21",1],["2026-10-25 19:10:22",2],["2026-10-25 19:10:23",9],["2026-10-25 19:10:24",2]],
+                            },
+                            
+                        ]
+                    });
+                </script>
+            </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th colspan="2">Transaction</th>
+                    <th># Times Run</th>
+                    <th># Fails</th>
+                    <th>Average (ms)</th>
+                    <th>Min (ms)</th>
+                    <th>Max (ms)</th>
+                    <th>RPS</th>
+                    <th>Failures/s</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+            <td colspan="10" align="left"><strong>workflow</strong></td>
+        </tr>
+<tr>
+            <td colspan="2">0.0 </strong></td>
+            <td>32</td>
+            <td>0</td>
+            <td>82642.81</td>
+            <td>41493</td>
+            <td>113246</td>
+            <td>0.18</td>
+            <td>0.00</td>
+        </tr>
+<tr>
+            <td colspan="2"> Aggregated</strong></td>
+            <td>32</td>
+            <td>0</td>
+            <td>14230.59</td>
+            <td>41493</td>
+            <td>113246</td>
+            <td>0.18</td>
+            <td>0.00</td>
+        </tr>
+            </tbody>
+        </table>
+    </div>
+
+        <div class="scenarios">
+        <h2>Scenario Metrics</h2>
+
+        <div class="graph">
+                <div id="graph-sps" style="width: 1000px; height:500px; background: white;"></div>
+
+                <script type="text/javascript">
+                    var chartDom = document.getElementById('graph-sps');
+                    var myChart = echarts.init(chartDom);
+
+                    myChart.setOption({
+                        color: ['#2c664f', '#5470c6', '#91cc75', '#fac858', '#ee6666', '#73c0de', '#3ba272', '#fc8452', '#9a60b4', '#ea7ccc'],
+                        tooltip: { trigger: 'axis' },
+                        toolbox: {
+                            feature: {
+                                dataZoom: { yAxisIndex: 'none' },
+                                restore: {},
+                                saveAsImage: {}
+                            }
+                        },
+                        dataZoom: [
+                            {
+                                type: 'inside',
+                                start: 0,
+                                end: 100,
+                                fillerColor: 'rgba(34, 80, 61, 0.25)',
+                                selectedDataBackground: {
+                                    lineStyle: { color: '#2c664f' },
+                                    areaStyle: { color: '#378063' }
+                                }
+                            },
+                            {
+                                start: 0,
+                                end: 100,
+                                fillerColor: 'rgba(34, 80, 61, 0.25)',
+                                selectedDataBackground: {
+                                    lineStyle: { color: '#2c664f' },
+                                    areaStyle: { color: '#378063' }
+                                }
+                            },
+                        ],
+                        xAxis: { type: 'time' },
+                        yAxis: {
+                            name: 'Scenarios #',
+                            nameLocation: 'center',
+                            nameRotate: 90,
+                            nameGap: 45,
+                            type: 'value'
+                        },
+                        
+                        series: [
+                            {
+                                name: 'Total',
+                                type: 'line',
+                                symbol: 'none',
+                                sampling: 'lttb',
+                                lineStyle: { color: '#2c664f' },
+                                areaStyle: { color: '#378063' },
+                                markArea: {
+                                    data: [
+                                        [
+                            {
+                                xAxis: '2026-10-25 19:08:31',
+                                itemStyle: { borderColor: 'rgba(44, 102, 79, 0.25)', borderWidth: 1 },
+                            },
+                            {
+                                xAxis: '2026-10-25 19:08:31'
+                            }
+                        ],
+                        [
+                            {
+                                xAxis: '2026-10-25 19:08:31',
+                                itemStyle: { color: 'rgba(44, 102, 79, 0.05)' },
+                            },
+                            {
+                                xAxis: '2026-10-25 19:08:31'
+                            }
+                        ],
+                        [
+                            {
+                                xAxis: '2026-10-25 19:08:31',
+                                itemStyle: { borderColor: 'rgba(44, 102, 79, 0.25)', borderWidth: 1 },
+                            },
+                            {
+                                xAxis: '2026-10-25 19:08:31'
+                            }
+                        ],[
+                            {
+                                xAxis: '2026-10-25 19:11:26',
+                                itemStyle: { borderColor: 'rgba(179, 65, 65, 0.25)', borderWidth: 1 },
+                            },
+                            {
+                                xAxis: '2026-10-25 19:11:26'
+                            }
+                        ],
+                        [
+                            {
+                                xAxis: '2026-10-25 19:11:26',
+                                itemStyle: { color: 'rgba(179, 65, 65, 0.05)' },
+                            },
+                            {
+                                xAxis: '2026-10-25 19:11:26'
+                            }
+                        ],
+                        [
+                            {
+                                xAxis: '2026-10-25 19:11:26',
+                                itemStyle: { borderColor: 'rgba(179, 65, 65, 0.25)', borderWidth: 1 },
+                            },
+                            {
+                                xAxis: '2026-10-25 19:11:26'
+                            }
+                        ],
+                                    ]
+                                },
+                                data: [["2026-10-25 19:10:17",1],["2026-10-25 19:10:20",1],["2026-10-25 19:10:21",1],["2026-10-25 19:10:22",2],["2026-10-25 19:10:23",9],["2026-10-25 19:10:24",2],["2026-10-25 19:11:02",1],["2026-10-25 19:11:03",1],["2026-10-25 19:11:04",1],["2026-10-25 19:11:06",1],["2026-10-25 19:11:07",1],["2026-10-25 19:11:10",1],["2026-10-25 19:11:17",1],["2026-10-25 19:11:20",1],["2026-10-25 19:11:22",3],["2026-10-25 19:11:23",2],["2026-10-25 19:11:24",1],["2026-10-25 19:11:25",1],["2026-10-25 19:11:26",1]],
+                            },
+                            
+                        ]
+                    });
+                </script>
+            </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th colspan="2">Scenario</th>
+                    <th># Users</th>
+                    <th># Times Run</th>
+                    <th>Average (ms)</th>
+                    <th>Min (ms)</th>
+                    <th>Max (ms)</th>
+                    <th>Scenarios/s</th>
+                    <th>Iterations</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+            <td colspan="2">workflow</strong></td>
+            <td>16</td>
+            <td>32</td>
+            <td>82642.81</td>
+            <td>41493</td>
+            <td>113246</td>
+            <td>0.18</td>
+            <td>2.00</td>
+        </tr>
+<tr>
+            <td colspan="2">Aggregated</strong></td>
+            <td>16</td>
+            <td>32</td>
+            <td>82642.81</td>
+            <td>41493</td>
+            <td>113246</td>
+            <td>0.18</td>
+            <td>2.00</td>
+        </tr>
+            </tbody>
+        </table>
+    </div>
+
+        <div class="users">
+        <h2>User Metrics</h2>
+            <div class="graph">
+                <div id="graph-active-users" style="width: 1000px; height:500px; background: white;"></div>
+
+                <script type="text/javascript">
+                    var chartDom = document.getElementById('graph-active-users');
+                    var myChart = echarts.init(chartDom);
+
+                    myChart.setOption({
+                        color: ['#2c664f', '#5470c6', '#91cc75', '#fac858', '#ee6666', '#73c0de', '#3ba272', '#fc8452', '#9a60b4', '#ea7ccc'],
+                        tooltip: { trigger: 'axis' },
+                        toolbox: {
+                            feature: {
+                                dataZoom: { yAxisIndex: 'none' },
+                                restore: {},
+                                saveAsImage: {}
+                            }
+                        },
+                        dataZoom: [
+                            {
+                                type: 'inside',
+                                start: 0,
+                                end: 100,
+                                fillerColor: 'rgba(34, 80, 61, 0.25)',
+                                selectedDataBackground: {
+                                    lineStyle: { color: '#2c664f' },
+                                    areaStyle: { color: '#378063' }
+                                }
+                            },
+                            {
+                                start: 0,
+                                end: 100,
+                                fillerColor: 'rgba(34, 80, 61, 0.25)',
+                                selectedDataBackground: {
+                                    lineStyle: { color: '#2c664f' },
+                                    areaStyle: { color: '#378063' }
+                                }
+                            },
+                        ],
+                        xAxis: { type: 'time' },
+                        yAxis: {
+                            name: 'Active users #',
+                            nameLocation: 'center',
+                            nameRotate: 90,
+                            nameGap: 45,
+                            type: 'value'
+                        },
+                        
+                        series: [
+                            {
+                                name: 'Total',
+                                type: 'line',
+                                symbol: 'none',
+                                sampling: 'lttb',
+                                lineStyle: { color: '#2c664f' },
+                                areaStyle: { color: '#378063' },
+                                markArea: {
+                                    data: [
+                                        [
+                            {
+                                xAxis: '2026-10-25 19:08:31',
+                                itemStyle: { borderColor: 'rgba(44, 102, 79, 0.25)', borderWidth: 1 },
+                            },
+                            {
+                                xAxis: '2026-10-25 19:08:31'
+                            }
+                        ],
+                        [
+                            {
+                                xAxis: '2026-10-25 19:08:31',
+                                itemStyle: { color: 'rgba(44, 102, 79, 0.05)' },
+                            },
+                            {
+                                xAxis: '2026-10-25 19:08:31'
+                            }
+                        ],
+                        [
+                            {
+                                xAxis: '2026-10-25 19:08:31',
+                                itemStyle: { borderColor: 'rgba(44, 102, 79, 0.25)', borderWidth: 1 },
+                            },
+                            {
+                                xAxis: '2026-10-25 19:08:31'
+                            }
+                        ],[
+                            {
+                                xAxis: '2026-10-25 19:11:26',
+                                itemStyle: { borderColor: 'rgba(179, 65, 65, 0.25)', borderWidth: 1 },
+                            },
+                            {
+                                xAxis: '2026-10-25 19:11:26'
+                            }
+                        ],
+                        [
+                            {
+                                xAxis: '2026-10-25 19:11:26',
+                                itemStyle: { color: 'rgba(179, 65, 65, 0.05)' },
+                            },
+                            {
+                                xAxis: '2026-10-25 19:11:26'
+                            }
+                        ],
+                        [
+                            {
+                                xAxis: '2026-10-25 19:11:26',
+                                itemStyle: { borderColor: 'rgba(179, 65, 65, 0.25)', borderWidth: 1 },
+                            },
+                            {
+                                xAxis: '2026-10-25 19:11:26'
+                            }
+                        ],
+                                    ]
+                                },
+                                data: [["2026-10-25 19:08:31",16],["2026-10-25 19:08:32",16],["2026-10-25 19:08:33",16],["2026-10-25 19:08:34",16],["2026-10-25 19:08:35",16],["2026-10-25 19:08:36",16],["2026-10-25 19:08:37",16],["2026-10-25 19:08:38",16],["2026-10-25 19:08:39",16],["2026-10-25 19:08:40",16],["2026-10-25 19:08:41",16],["2026-10-25 19:08:42",16],["2026-10-25 19:08:43",16],["2026-10-25 19:08:44",16],["2026-10-25 19:08:45",16],["2026-10-25 19:08:46",16],["2026-10-25 19:08:47",16],["2026-10-25 19:08:48",16],["2026-10-25 19:08:49",16],["2026-10-25 19:08:50",16],["2026-10-25 19:08:51",16],["2026-10-25 19:08:52",16],["2026-10-25 19:08:53",16],["2026-10-25 19:08:54",16],["2026-10-25 19:08:55",16],["2026-10-25 19:08:56",16],["2026-10-25 19:08:57",16],["2026-10-25 19:08:58",16],["2026-10-25 19:08:59",16],["2026-10-25 19:09:00",16],["2026-10-25 19:09:01",16],["2026-10-25 19:09:02",16],["2026-10-25 19:09:03",16],["2026-10-25 19:09:04",16],["2026-10-25 19:09:05",16],["2026-10-25 19:09:06",16],["2026-10-25 19:09:07",16],["2026-10-25 19:09:08",16],["2026-10-25 19:09:09",16],["2026-10-25 19:09:10",16],["2026-10-25 19:09:11",16],["2026-10-25 19:09:12",16],["2026-10-25 19:09:13",16],["2026-10-25 19:09:14",16],["2026-10-25 19:09:15",16],["2026-10-25 19:09:16",16],["2026-10-25 19:09:17",16],["2026-10-25 19:09:18",16],["2026-10-25 19:09:19",16],["2026-10-25 19:09:20",16],["2026-10-25 19:09:21",16],["2026-10-25 19:09:22",16],["2026-10-25 19:09:23",16],["2026-10-25 19:09:24",16],["2026-10-25 19:09:25",16],["2026-10-25 19:09:26",16],["2026-10-25 19:09:27",16],["2026-10-25 19:09:28",16],["2026-10-25 19:09:29",16],["2026-10-25 19:09:30",16],["2026-10-25 19:09:31",16],["2026-10-25 19:09:32",16],["2026-10-25 19:09:33",16],["2026-10-25 19:09:34",16],["2026-10-25 19:09:35",16],["2026-10-25 19:09:36",16],["2026-10-25 19:09:37",16],["2026-10-25 19:09:38",16],["2026-10-25 19:09:39",16],["2026-10-25 19:09:40",16],["2026-10-25 19:09:41",16],["2026-10-25 19:09:42",16],["2026-10-25 19:09:43",16],["2026-10-25 19:09:44",16],["2026-10-25 19:09:45",16],["2026-10-25 19:09:46",16],["2026-10-25 19:09:47",16],["2026-10-25 19:09:48",16],["2026-10-25 19:09:49",16],["2026-10-25 19:09:50",16],["2026-10-25 19:09:51",16],["2026-10-25 19:09:52",16],["2026-10-25 19:09:53",16],["2026-10-25 19:09:54",16],["2026-10-25 19:09:55",16],["2026-10-25 19:09:56",16],["2026-10-25 19:09:57",16],["2026-10-25 19:09:58",16],["2026-10-25 19:09:59",16],["2026-10-25 19:10:00",16],["2026-10-25 19:10:01",16],["2026-10-25 19:10:02",16],["2026-10-25 19:10:03",16],["2026-10-25 19:10:04",16],["2026-10-25 19:10:05",16],["2026-10-25 19:10:06",16],["2026-10-25 19:10:07",16],["2026-10-25 19:10:08",16],["2026-10-25 19:10:09",16],["2026-10-25 19:10:10",16],["2026-10-25 19:10:11",16],["2026-10-25 19:10:12",16],["2026-10-25 19:10:13",16],["2026-10-25 19:10:14",16],["2026-10-25 19:10:15",16],["2026-10-25 19:10:16",16],["2026-10-25 19:10:17",16],["2026-10-25 19:10:18",16],["2026-10-25 19:10:19",16],["2026-10-25 19:10:20",16],["2026-10-25 19:10:21",16],["2026-10-25 19:10:22",16],["2026-10-25 19:10:23",16],["2026-10-25 19:10:24",16],["2026-10-25 19:10:25",16],["2026-10-25 19:10:26",16],["2026-10-25 19:10:27",16],["2026-10-25 19:10:28",16],["2026-10-25 19:10:29",16],["2026-10-25 19:10:30",16],["2026-10-25 19:10:31",16],["2026-10-25 19:10:32",16],["2026-10-25 19:10:33",16],["2026-10-25 19:10:34",16],["2026-10-25 19:10:35",16],["2026-10-25 19:10:36",16],["2026-10-25 19:10:37",16],["2026-10-25 19:10:38",16],["2026-10-25 19:10:39",16],["2026-10-25 19:10:40",16],["2026-10-25 19:10:41",16],["2026-10-25 19:10:42",16],["2026-10-25 19:10:43",16],["2026-10-25 19:10:44",16],["2026-10-25 19:10:45",16],["2026-10-25 19:10:46",16],["2026-10-25 19:10:47",16],["2026-10-25 19:10:48",16],["2026-10-25 19:10:49",16],["2026-10-25 19:10:50",16],["2026-10-25 19:10:51",16],["2026-10-25 19:10:52",16],["2026-10-25 19:10:53",16],["2026-10-25 19:10:54",16],["2026-10-25 19:10:55",16],["2026-10-25 19:10:56",16],["2026-10-25 19:10:57",16],["2026-10-25 19:10:58",16],["2026-10-25 19:10:59",16],["2026-10-25 19:11:00",16],["2026-10-25 19:11:01",16],["2026-10-25 19:11:02",16],["2026-10-25 19:11:03",16],["2026-10-25 19:11:04",16],["2026-10-25 19:11:05",16],["2026-10-25 19:11:06",16],["2026-10-25 19:11:07",16],["2026-10-25 19:11:08",16],["2026-10-25 19:11:09",16],["2026-10-25 19:11:10",16],["2026-10-25 19:11:11",16],["2026-10-25 19:11:12",16],["2026-10-25 19:11:13",16],["2026-10-25 19:11:14",16],["2026-10-25 19:11:15",16],["2026-10-25 19:11:16",16],["2026-10-25 19:11:17",16],["2026-10-25 19:11:18",16],["2026-10-25 19:11:19",16],["2026-10-25 19:11:20",16],["2026-10-25 19:11:21",16],["2026-10-25 19:11:22",16],["2026-10-25 19:11:23",16],["2026-10-25 19:11:24",16],["2026-10-25 19:11:25",16]],
+                            },
+                            
+                        ]
+                    });
+                </script>
+            </div>
+        </div>
+
+        <div class="errors">
+        <h2>Errors</h2>
+
+        <div class="graph">
+                <div id="graph-eps" style="width: 1000px; height:500px; background: white;"></div>
+
+                <script type="text/javascript">
+                    var chartDom = document.getElementById('graph-eps');
+                    var myChart = echarts.init(chartDom);
+
+                    myChart.setOption({
+                        color: ['#2c664f', '#5470c6', '#91cc75', '#fac858', '#ee6666', '#73c0de', '#3ba272', '#fc8452', '#9a60b4', '#ea7ccc'],
+                        tooltip: { trigger: 'axis' },
+                        toolbox: {
+                            feature: {
+                                dataZoom: { yAxisIndex: 'none' },
+                                restore: {},
+                                saveAsImage: {}
+                            }
+                        },
+                        dataZoom: [
+                            {
+                                type: 'inside',
+                                start: 0,
+                                end: 100,
+                                fillerColor: 'rgba(34, 80, 61, 0.25)',
+                                selectedDataBackground: {
+                                    lineStyle: { color: '#2c664f' },
+                                    areaStyle: { color: '#378063' }
+                                }
+                            },
+                            {
+                                start: 0,
+                                end: 100,
+                                fillerColor: 'rgba(34, 80, 61, 0.25)',
+                                selectedDataBackground: {
+                                    lineStyle: { color: '#2c664f' },
+                                    areaStyle: { color: '#378063' }
+                                }
+                            },
+                        ],
+                        xAxis: { type: 'time' },
+                        yAxis: {
+                            name: 'Errors #',
+                            nameLocation: 'center',
+                            nameRotate: 90,
+                            nameGap: 45,
+                            type: 'value'
+                        },
+                        
+                        series: [
+                            {
+                                name: 'POST task.fulfill',
+                                type: 'line',
+                                symbol: 'none',
+                                sampling: 'lttb',
+                                lineStyle: { color: '#2c664f' },
+                                areaStyle: { color: '#378063' },
+                                markArea: {
+                                    data: [
+                                        [
+                            {
+                                xAxis: '2026-10-25 19:08:31',
+                                itemStyle: { borderColor: 'rgba(44, 102, 79, 0.25)', borderWidth: 1 },
+                            },
+                            {
+                                xAxis: '2026-10-25 19:08:31'
+                            }
+                        ],
+                        [
+                            {
+                                xAxis: '2026-10-25 19:08:31',
+                                itemStyle: { color: 'rgba(44, 102, 79, 0.05)' },
+                            },
+                            {
+                                xAxis: '2026-10-25 19:08:31'
+                            }
+                        ],
+                        [
+                            {
+                                xAxis: '2026-10-25 19:08:31',
+                                itemStyle: { borderColor: 'rgba(44, 102, 79, 0.25)', borderWidth: 1 },
+                            },
+                            {
+                                xAxis: '2026-10-25 19:08:31'
+                            }
+                        ],[
+                            {
+                                xAxis: '2026-10-25 19:11:26',
+                                itemStyle: { borderColor: 'rgba(179, 65, 65, 0.25)', borderWidth: 1 },
+                            },
+                            {
+                                xAxis: '2026-10-25 19:11:26'
+                            }
+                        ],
+                        [
+                            {
+                                xAxis: '2026-10-25 19:11:26',
+                                itemStyle: { color: 'rgba(179, 65, 65, 0.05)' },
+                            },
+                            {
+                                xAxis: '2026-10-25 19:11:26'
+                            }
+                        ],
+                        [
+                            {
+                                xAxis: '2026-10-25 19:11:26',
+                                itemStyle: { borderColor: 'rgba(179, 65, 65, 0.25)', borderWidth: 1 },
+                            },
+                            {
+                                xAxis: '2026-10-25 19:11:26'
+                            }
+                        ],
+                                    ]
+                                },
+                                data: [["2026-10-25 19:10:18",1]],
+                            },
+                            
+                        ]
+                    });
+                </script>
+            </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th colspan="3">Error</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+        <td>1</td>
+        <td colspan="4">409 Conflict: task.fulfill</strong></td>
+    </tr>
+            </tbody>
+        </table>
+    </div>
+
+        
+
+    </div>
+</body>
+</html>

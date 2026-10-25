@@ -1,0 +1,96 @@
+{
+  "run_id": "tidb5x-fanout-c16-i3",
+  "system": "resonate",
+  "backend": "tidb5x-aws-ap-southeast-1-i3",
+  "workload": "fanout",
+  "params": {
+    "concurrency": 16,
+    "k": 8,
+    "n": 32,
+    "wake": "push"
+  },
+  "started": 32,
+  "completed": 31,
+  "failed": 1,
+  "retries": 0,
+  "wall_s": 141.991905685,
+  "throughput_wf_s": 0.21832230401056468,
+  "latency": {
+    "n": 31,
+    "mean_ms": 64185.64295009677,
+    "p50_ms": 50585.251605,
+    "p95_ms": 90348.341078,
+    "p99_ms": 92062.624619,
+    "max_ms": 92062.624619
+  },
+  "steps": {
+    "activity": {
+      "n": 256,
+      "mean_ms": 43376.249875660156,
+      "p50_ms": 39048.095886,
+      "p95_ms": 75149.777356,
+      "p99_ms": 79677.865914,
+      "max_ms": 80917.974025
+    }
+  },
+  "sleep_lateness": null,
+  "requests": {
+    "task.create": {
+      "n": 32,
+      "mean_ms": 4389.45619490625,
+      "p50_ms": 4117.143436,
+      "p95_ms": 6650.236733,
+      "p99_ms": 6865.042498,
+      "max_ms": 6865.042498
+    },
+    "task.fence(promise.create)": {
+      "n": 256,
+      "mean_ms": 19723.95949896875,
+      "p50_ms": 15885.187327,
+      "p95_ms": 40237.938116,
+      "p99_ms": 44233.380374,
+      "max_ms": 46319.734886
+    },
+    "task.fence(promise.settle)": {
+      "n": 256,
+      "mean_ms": 23652.205072257813,
+      "p50_ms": 21673.24853,
+      "p95_ms": 35930.104978,
+      "p99_ms": 43002.927666,
+      "max_ms": 44200.911934
+    },
+    "task.fulfill": {
+      "n": 32,
+      "mean_ms": 4401.6430065625,
+      "p50_ms": 4475.302743,
+      "p95_ms": 6541.604573,
+      "p99_ms": 6571.018162,
+      "max_ms": 6571.018162
+    },
+    "task.heartbeat": {
+      "n": 48,
+      "mean_ms": 17879.619988958333,
+      "p50_ms": 17074.972572,
+      "p95_ms": 29276.129395,
+      "p99_ms": 31801.275546,
+      "max_ms": 31801.275546
+    }
+  },
+  "request_errors": 1,
+  "errors": {
+    "task.fulfill 409: Task version mismatch or invalid state": 1
+  },
+  "resources": [
+    {
+      "target": "pid:1081313",
+      "cpu_avg_pct": 0.7831491792634291,
+      "cpu_max_pct": 1.9998766516078823,
+      "rss_avg_mb": 32.69312718531469,
+      "rss_max_mb": 34.44921875,
+      "samples": 143
+    }
+  ],
+  "notes": [
+    "5 Starter instances at once (aws-ap-southeast-1), instance 3 of 5, pool 64; step c16"
+  ]
+}

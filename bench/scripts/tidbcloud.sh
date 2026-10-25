@@ -23,7 +23,7 @@ regions)
 list)
   api "$API/clusters?pageSize=100" | jq -r '.clusters[]? | select(.labels.rbench=="1") | "\(.clusterId)\t\(.displayName)\t\(.region.regionId)\t\(.state)"' ;;
 create)
-  region=$2; name="rbench-${region}-$(date +%m%d%H%M)"
+  region=$2; name="rbench-${region}-$(date +%m%d%H%M)-$(od -An -N2 -tu2 /dev/urandom | tr -d " ")"
   pw=$(head -c 24 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | head -c 24)
   body=$(jq -n --arg n "$name" --arg r "regions/$region" --arg p "$pw" \
     '{displayName:$n, region:{name:$r}, spendingLimit:{monthly:0}, rootPassword:$p, labels:{rbench:"1"}}')

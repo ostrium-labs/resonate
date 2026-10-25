@@ -32,6 +32,8 @@ KEEP = (
 
 
 def group(service):
+    if service.startswith("resonate-server-tidb5x-"):
+        return "resonate-tidb5x"
     for prefix, g in KEEP:
         if service == prefix or service.startswith(prefix + "."):
             return g
@@ -75,6 +77,9 @@ def main():
                 for rs in req.get("resourceSpans", []):
                     svc = service_of(rs)
                     g = group(svc)
+                    only = os.environ.get("ONLY")
+                    if g is not None and only and g not in only.split(","):
+                        g = None
                     n = sum(len(ss.get("spans", [])) for ss in rs.get("scopeSpans", []))
                     if g is None:
                         dropped[svc] += n

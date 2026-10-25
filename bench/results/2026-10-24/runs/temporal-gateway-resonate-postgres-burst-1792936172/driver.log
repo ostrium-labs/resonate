@@ -1,0 +1,31 @@
+rbench-temporal: mode=all workload=burst n=500 k=8 l=5 sleep_ms=1000 concurrency=500 run=temporal-gateway-resonate-postgres-burst-1792936172 address=127.0.0.1:17234 namespace=default task_queue=rbench
+rbench-temporal: starter: activity_timeout=10s wf_timeout=10m0s burst_start_workers=256
+rbench-temporal: worker: max_activities=200 max_workflow_tasks=200 activity_pollers=8 workflow_pollers=8 sticky_cache=10000
+rbench-temporal: otel: exporting spans to http://127.0.0.1:4317 as service rbench-temporal-gateway
+rbench-temporal: burst: 500 starts sent
+panic: could not get last history event for workflow
+
+goroutine 594 [running]:
+go.temporal.io/sdk/internal.(*workflowRunImpl).GetWithOptions(0x24b124249300, {0x10f7878, 0x24b12437e390}, {0xdc7620, 0x24b123624c80}, {0x1?})
+	go.temporal.io/sdk@v1.49.0/internal/internal_workflow_client.go:1939 +0xb8c
+go.temporal.io/sdk/internal.(*workflowRunImpl).Get(0x0?, {0x10f7878?, 0x24b12437e390?}, {0xdc7620?, 0x24b123624c80?})
+	go.temporal.io/sdk@v1.49.0/internal/internal_workflow_client.go:1929 +0x2a
+main.(*starter).await(0x24b122f65560, 0x24b124118240)
+	github.com/ostrium-labs/resonate/bench/drivers/temporal-go/main.go:256 +0x79
+main.(*starter).runBurst.func2(0x0?)
+	github.com/ostrium-labs/resonate/bench/drivers/temporal-go/main.go:337 +0x4d
+created by main.(*starter).runBurst in goroutine 1
+	github.com/ostrium-labs/resonate/bench/drivers/temporal-go/main.go:335 +0x285
+panic: could not get last history event for workflow
+
+goroutine 562 [running]:
+go.temporal.io/sdk/internal.(*workflowRunImpl).GetWithOptions(0x24b1259a2d00, {0x10f7878, 0x24b12423c180}, {0xdc7620, 0x24b125e11380}, {0x1?})
+	go.temporal.io/sdk@v1.49.0/internal/internal_workflow_client.go:1939 +0xb8c
+go.temporal.io/sdk/internal.(*workflowRunImpl).Get(0x0?, {0x10f7878?, 0x24b12423c180?}, {0xdc7620?, 0x24b125e11380?})
+	go.temporal.io/sdk@v1.49.0/internal/internal_workflow_client.go:1929 +0x2a
+main.(*starter).await(0x24b122f65560, 0x24b123754180)
+	github.com/ostrium-labs/resonate/bench/drivers/temporal-go/main.go:256 +0x79
+main.(*starter).runBurst.func2(0x0?)
+	github.com/ostrium-labs/resonate/bench/drivers/temporal-go/main.go:337 +0x4d
+created by main.(*starter).runBurst in goroutine 1
+	github.com/ostrium-labs/resonate/bench/drivers/temporal-go/main.go:335 +0x285

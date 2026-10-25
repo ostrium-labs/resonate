@@ -1,0 +1,97 @@
+{
+  "run_id": "tidb5x-burst-p256-n500-i4",
+  "system": "resonate",
+  "backend": "tidb5x-aws-ap-southeast-1-i4",
+  "workload": "burst",
+  "params": {
+    "concurrency": 500,
+    "n": 500,
+    "wake": "push"
+  },
+  "started": 500,
+  "completed": 415,
+  "failed": 85,
+  "retries": 0,
+  "wall_s": 76.824922689,
+  "throughput_wf_s": 5.401892842508786,
+  "latency": {
+    "n": 415,
+    "mean_ms": 74335.4846736048,
+    "p50_ms": 74713.205845,
+    "p95_ms": 76610.066266,
+    "p99_ms": 76704.710248,
+    "max_ms": 76800.060944
+  },
+  "steps": {
+    "activity": {
+      "n": 415,
+      "mean_ms": 39979.70443060482,
+      "p50_ms": 40736.733261,
+      "p95_ms": 45829.87545,
+      "p99_ms": 46726.597532,
+      "max_ms": 50529.702759
+    }
+  },
+  "sleep_lateness": null,
+  "requests": {
+    "task.create": {
+      "n": 500,
+      "mean_ms": 21240.671797486,
+      "p50_ms": 20357.559884,
+      "p95_ms": 30212.440528,
+      "p99_ms": 30265.151489,
+      "max_ms": 30270.845154
+    },
+    "task.fence(promise.create)": {
+      "n": 421,
+      "mean_ms": 14623.084542983373,
+      "p50_ms": 12492.830254,
+      "p95_ms": 23613.958932,
+      "p99_ms": 26133.781644,
+      "max_ms": 30002.332991
+    },
+    "task.fence(promise.settle)": {
+      "n": 420,
+      "mean_ms": 25395.3412325,
+      "p50_ms": 24691.885517,
+      "p95_ms": 31198.931256,
+      "p99_ms": 32401.039867,
+      "max_ms": 33038.240437
+    },
+    "task.fulfill": {
+      "n": 415,
+      "mean_ms": 14752.93882314458,
+      "p50_ms": 16796.215286,
+      "p95_ms": 19576.321425,
+      "p99_ms": 20666.306493,
+      "max_ms": 22505.916639
+    },
+    "task.heartbeat": {
+      "n": 419,
+      "mean_ms": 21222.210709217183,
+      "p50_ms": 20962.144649,
+      "p95_ms": 23931.747118,
+      "p99_ms": 25436.739453,
+      "max_ms": 27158.147559
+    }
+  },
+  "request_errors": 85,
+  "errors": {
+    "fence create 500: Internal error: Storage error: pool timed out while waiting fo": 1,
+    "fence settle 500: Internal error: Storage error: pool timed out while waiting fo": 5,
+    "task.create 500: Internal error: Storage error: pool timed out while waiting for": 79
+  },
+  "resources": [
+    {
+      "target": "pid:1154175",
+      "cpu_avg_pct": 4.986108984962794,
+      "cpu_max_pct": 12.998410879277955,
+      "rss_avg_mb": 87.48456790123457,
+      "rss_max_mb": 106.359375,
+      "samples": 81
+    }
+  ],
+  "notes": [
+    "5 Starter instances at once (aws-ap-southeast-1), instance 4 of 5, pool 256; step p256-n500"
+  ]
+}

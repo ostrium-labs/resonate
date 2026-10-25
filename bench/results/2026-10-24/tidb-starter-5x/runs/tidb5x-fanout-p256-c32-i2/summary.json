@@ -1,0 +1,102 @@
+{
+  "run_id": "tidb5x-fanout-p256-c32-i2",
+  "system": "resonate",
+  "backend": "tidb5x-aws-ap-southeast-1-i2",
+  "workload": "fanout",
+  "params": {
+    "concurrency": 32,
+    "k": 8,
+    "n": 64,
+    "wake": "push"
+  },
+  "started": 64,
+  "completed": 21,
+  "failed": 43,
+  "retries": 147,
+  "wall_s": 325.258616404,
+  "throughput_wf_s": 0.0645640082718551,
+  "latency": {
+    "n": 21,
+    "mean_ms": 68260.97057738095,
+    "p50_ms": 53960.562053,
+    "p95_ms": 118677.340875,
+    "p99_ms": 137972.131073,
+    "max_ms": 137972.131073
+  },
+  "steps": {
+    "activity": {
+      "n": 364,
+      "mean_ms": 56794.33114757692,
+      "p50_ms": 56219.790118,
+      "p95_ms": 92714.047847,
+      "p99_ms": 128723.317572,
+      "max_ms": 254480.966606
+    }
+  },
+  "sleep_lateness": null,
+  "requests": {
+    "task.create": {
+      "n": 64,
+      "mean_ms": 8815.840232203125,
+      "p50_ms": 10963.481546,
+      "p95_ms": 12328.781645,
+      "p99_ms": 18036.730173,
+      "max_ms": 22085.53285
+    },
+    "task.fence(promise.create)": {
+      "n": 533,
+      "mean_ms": 24368.128346060035,
+      "p50_ms": 23712.532308,
+      "p95_ms": 60000.977085,
+      "p99_ms": 60001.658098,
+      "max_ms": 60003.694487
+    },
+    "task.fence(promise.settle)": {
+      "n": 540,
+      "mean_ms": 35718.509892690745,
+      "p50_ms": 34829.746993,
+      "p95_ms": 60001.637949,
+      "p99_ms": 60002.037751,
+      "max_ms": 60002.975354
+    },
+    "task.fulfill": {
+      "n": 22,
+      "mean_ms": 4725.137283681818,
+      "p50_ms": 2698.841185,
+      "p95_ms": 18648.81997,
+      "p99_ms": 20581.627599,
+      "max_ms": 20581.627599
+    },
+    "task.heartbeat": {
+      "n": 121,
+      "mean_ms": 26258.160681471072,
+      "p50_ms": 23556.388627,
+      "p95_ms": 60001.901046,
+      "p99_ms": 60003.681107,
+      "max_ms": 60004.793864
+    }
+  },
+  "request_errors": 346,
+  "errors": {
+    "fence create 0: \"error sending request for url (http://127.0.0.1:18022/)\"": 1,
+    "fence create 500: Internal error: Storage error: error communicating with databa": 12,
+    "fence create 500: Internal error: Storage error: pool timed out while waiting fo": 1,
+    "fence settle 0: \"error sending request for url (http://127.0.0.1:18022/)\"": 4,
+    "fence settle 500: Internal error: Storage error: error communicating with databa": 22,
+    "task.create 500: Internal error: Storage error: error communicating with databas": 2,
+    "task.fulfill 409: Task version mismatch or invalid state": 1
+  },
+  "resources": [
+    {
+      "target": "pid:1153599",
+      "cpu_avg_pct": 0.9905886872642119,
+      "cpu_max_pct": 4.9993706792189005,
+      "rss_avg_mb": 52.34659855769231,
+      "rss_max_mb": 65.62109375,
+      "samples": 325
+    }
+  ],
+  "notes": [
+    "5 Starter instances at once (aws-ap-southeast-1), instance 2 of 5, pool 256; step p256-c32"
+  ]
+}

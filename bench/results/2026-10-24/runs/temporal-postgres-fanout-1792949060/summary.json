@@ -1,0 +1,70 @@
+{
+  "run_id": "temporal-postgres-fanout-1792949060",
+  "system": "temporal",
+  "backend": "postgres",
+  "workload": "fanout",
+  "params": {
+    "concurrency": 20,
+    "k": 8,
+    "n": 500
+  },
+  "started": 500,
+  "completed": 498,
+  "failed": 2,
+  "retries": 15,
+  "wall_s": 71.141577981,
+  "throughput_wf_s": 7.00012586357028,
+  "latency": {
+    "n": 498,
+    "mean_ms": 2626.9964728313257,
+    "p50_ms": 583.484697,
+    "p95_ms": 8729.495387,
+    "p99_ms": 35275.6516,
+    "max_ms": 43732.900684
+  },
+  "steps": {
+    "activity": {
+      "n": 3999,
+      "mean_ms": 896.2221829404851,
+      "p50_ms": 144.650437,
+      "p95_ms": 2749.395204,
+      "p99_ms": 28835.489448,
+      "max_ms": 40541.457761
+    }
+  },
+  "sleep_lateness": null,
+  "requests": {},
+  "request_errors": 0,
+  "errors": {
+    "context deadline exceeded": 2
+  },
+  "resources": [
+    {
+      "target": "container:rbench-temporal-server",
+      "cpu_avg_pct": 64.16334748831122,
+      "cpu_max_pct": 363.38415254877947,
+      "rss_avg_mb": 306.5738336267606,
+      "rss_max_mb": 326.6640625,
+      "samples": 71
+    },
+    {
+      "target": "container:rbench-temporal-postgres",
+      "cpu_avg_pct": 35.62747294611722,
+      "cpu_max_pct": 223.216207526949,
+      "rss_avg_mb": 169.9568661971831,
+      "rss_max_mb": 275.55859375,
+      "samples": 71
+    },
+    {
+      "target": "pid:1449409",
+      "cpu_avg_pct": 10.827326657778404,
+      "cpu_max_pct": 76.9307077422295,
+      "rss_avg_mb": 52.37538512323944,
+      "rss_max_mb": 64.31640625,
+      "samples": 71
+    }
+  ],
+  "notes": [
+    "stock Temporal 1.32.1, four services in one container, Postgres 17.10 in podman, data on ext4 (/mnt/Projects); Go SDK 1.49.0 worker and starter in one process"
+  ]
+}

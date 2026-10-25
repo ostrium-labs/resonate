@@ -1,0 +1,85 @@
+{
+  "run_id": "tidb5x-burst-n50-i4",
+  "system": "resonate",
+  "backend": "tidb5x-aws-ap-southeast-1-i4",
+  "workload": "burst",
+  "params": {
+    "concurrency": 50,
+    "n": 50,
+    "wake": "push"
+  },
+  "started": 50,
+  "completed": 50,
+  "failed": 0,
+  "retries": 0,
+  "wall_s": 11.576655982,
+  "throughput_wf_s": 4.319036522959882,
+  "latency": {
+    "n": 50,
+    "mean_ms": 10036.954082940001,
+    "p50_ms": 10506.403808,
+    "p95_ms": 10544.166731,
+    "p99_ms": 11576.221314,
+    "max_ms": 11576.221314
+  },
+  "steps": {
+    "activity": {
+      "n": 50,
+      "mean_ms": 3705.3695157399998,
+      "p50_ms": 3591.640527,
+      "p95_ms": 4464.611099,
+      "p99_ms": 5823.494341,
+      "max_ms": 5823.494341
+    }
+  },
+  "sleep_lateness": null,
+  "requests": {
+    "task.create": {
+      "n": 50,
+      "mean_ms": 2854.4254175799997,
+      "p50_ms": 2785.03969,
+      "p95_ms": 3164.588226,
+      "p99_ms": 3403.133386,
+      "max_ms": 3403.133386
+    },
+    "task.fence(promise.create)": {
+      "n": 50,
+      "mean_ms": 1424.0390140999998,
+      "p50_ms": 1333.293288,
+      "p95_ms": 1831.117646,
+      "p99_ms": 3083.255332,
+      "max_ms": 3083.255332
+    },
+    "task.fence(promise.settle)": {
+      "n": 50,
+      "mean_ms": 2281.23804794,
+      "p50_ms": 2254.651055,
+      "p95_ms": 2633.818163,
+      "p99_ms": 3150.229726,
+      "max_ms": 3150.229726
+    },
+    "task.fulfill": {
+      "n": 50,
+      "mean_ms": 3474.5676071,
+      "p50_ms": 3678.994467,
+      "p95_ms": 4447.779587,
+      "p99_ms": 4488.563301,
+      "max_ms": 4488.563301
+    }
+  },
+  "request_errors": 0,
+  "errors": {},
+  "resources": [
+    {
+      "target": "pid:1081457",
+      "cpu_avg_pct": 2.8331085626721144,
+      "cpu_max_pct": 5.999448878627111,
+      "rss_avg_mb": 41.714518229166664,
+      "rss_max_mb": 43.94921875,
+      "samples": 12
+    }
+  ],
+  "notes": [
+    "5 Starter instances at once (aws-ap-southeast-1), instance 4 of 5, pool 64; step n50"
+  ]
+}

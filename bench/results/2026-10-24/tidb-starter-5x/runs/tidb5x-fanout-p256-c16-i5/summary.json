@@ -1,0 +1,97 @@
+{
+  "run_id": "tidb5x-fanout-p256-c16-i5",
+  "system": "resonate",
+  "backend": "tidb5x-aws-ap-southeast-1-i5",
+  "workload": "fanout",
+  "params": {
+    "concurrency": 16,
+    "k": 8,
+    "n": 32,
+    "wake": "push"
+  },
+  "started": 32,
+  "completed": 30,
+  "failed": 2,
+  "retries": 0,
+  "wall_s": 173.740826155,
+  "throughput_wf_s": 0.17267098737769324,
+  "latency": {
+    "n": 30,
+    "mean_ms": 80574.5556585,
+    "p50_ms": 61128.211715,
+    "p95_ms": 114126.104832,
+    "p99_ms": 114307.357809,
+    "max_ms": 114307.357809
+  },
+  "steps": {
+    "activity": {
+      "n": 255,
+      "mean_ms": 52441.9124440549,
+      "p50_ms": 48691.394539,
+      "p95_ms": 92796.980511,
+      "p99_ms": 96373.673415,
+      "max_ms": 99655.433741
+    }
+  },
+  "sleep_lateness": null,
+  "requests": {
+    "task.create": {
+      "n": 32,
+      "mean_ms": 8404.06278721875,
+      "p50_ms": 8701.977505,
+      "p95_ms": 16366.249733,
+      "p99_ms": 18582.758321,
+      "max_ms": 18582.758321
+    },
+    "task.fence(promise.create)": {
+      "n": 256,
+      "mean_ms": 22857.874550519533,
+      "p50_ms": 16587.471723,
+      "p95_ms": 47466.290676,
+      "p99_ms": 49575.444773,
+      "max_ms": 52766.647997
+    },
+    "task.fence(promise.settle)": {
+      "n": 256,
+      "mean_ms": 29760.086466503908,
+      "p50_ms": 28633.641787,
+      "p95_ms": 47153.621363,
+      "p99_ms": 48055.898779,
+      "max_ms": 48419.353304
+    },
+    "task.fulfill": {
+      "n": 31,
+      "mean_ms": 5862.171217322581,
+      "p50_ms": 3981.715954,
+      "p95_ms": 13874.444707,
+      "p99_ms": 15020.908908,
+      "max_ms": 15020.908908
+    },
+    "task.heartbeat": {
+      "n": 47,
+      "mean_ms": 26206.80561812766,
+      "p50_ms": 27291.171075,
+      "p95_ms": 32801.839838,
+      "p99_ms": 34152.715072,
+      "max_ms": 34152.715072
+    }
+  },
+  "request_errors": 2,
+  "errors": {
+    "fence settle 409: Version mismatch": 1,
+    "task.fulfill 409: Task version mismatch or invalid state": 1
+  },
+  "resources": [
+    {
+      "target": "pid:1154236",
+      "cpu_avg_pct": 1.0169542161292853,
+      "cpu_max_pct": 3.9993383014793435,
+      "rss_avg_mb": 37.84788074712644,
+      "rss_max_mb": 50.12890625,
+      "samples": 174
+    }
+  ],
+  "notes": [
+    "5 Starter instances at once (aws-ap-southeast-1), instance 5 of 5, pool 256; step p256-c16"
+  ]
+}

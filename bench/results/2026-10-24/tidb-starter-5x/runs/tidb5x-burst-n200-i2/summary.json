@@ -1,0 +1,93 @@
+{
+  "run_id": "tidb5x-burst-n200-i2",
+  "system": "resonate",
+  "backend": "tidb5x-aws-ap-southeast-1-i2",
+  "workload": "burst",
+  "params": {
+    "concurrency": 200,
+    "n": 200,
+    "wake": "push"
+  },
+  "started": 200,
+  "completed": 200,
+  "failed": 0,
+  "retries": 0,
+  "wall_s": 56.90030751,
+  "throughput_wf_s": 3.514919492567783,
+  "latency": {
+    "n": 200,
+    "mean_ms": 50313.16190643,
+    "p50_ms": 50614.9946,
+    "p95_ms": 56544.041627,
+    "p99_ms": 56847.834901,
+    "max_ms": 56886.88662
+  },
+  "steps": {
+    "activity": {
+      "n": 200,
+      "mean_ms": 24823.944151795,
+      "p50_ms": 24428.614846,
+      "p95_ms": 28083.546994,
+      "p99_ms": 29187.371413,
+      "max_ms": 30327.910463
+    }
+  },
+  "sleep_lateness": null,
+  "requests": {
+    "task.create": {
+      "n": 200,
+      "mean_ms": 9088.1960144,
+      "p50_ms": 8237.243061,
+      "p95_ms": 15228.564038,
+      "p99_ms": 15407.541421,
+      "max_ms": 15799.665164
+    },
+    "task.fence(promise.create)": {
+      "n": 200,
+      "mean_ms": 11100.00079861,
+      "p50_ms": 10712.124849,
+      "p95_ms": 14781.355578,
+      "p99_ms": 15204.108316,
+      "max_ms": 15968.18201
+    },
+    "task.fence(promise.settle)": {
+      "n": 200,
+      "mean_ms": 13723.78058191,
+      "p50_ms": 12320.025609,
+      "p95_ms": 19354.487388,
+      "p99_ms": 19681.278607,
+      "max_ms": 20258.368902
+    },
+    "task.fulfill": {
+      "n": 200,
+      "mean_ms": 16399.827744365,
+      "p50_ms": 17161.582925,
+      "p95_ms": 18815.876361,
+      "p99_ms": 19126.322703,
+      "max_ms": 19618.07534
+    },
+    "task.heartbeat": {
+      "n": 200,
+      "mean_ms": 15192.649229139999,
+      "p50_ms": 15397.113351,
+      "p95_ms": 17062.550465,
+      "p99_ms": 17223.171827,
+      "max_ms": 17283.27371
+    }
+  },
+  "request_errors": 0,
+  "errors": {},
+  "resources": [
+    {
+      "target": "pid:1081238",
+      "cpu_avg_pct": 3.06763560830586,
+      "cpu_max_pct": 5.999651942191877,
+      "rss_avg_mb": 47.1864224137931,
+      "rss_max_mb": 50.09375,
+      "samples": 58
+    }
+  ],
+  "notes": [
+    "5 Starter instances at once (aws-ap-southeast-1), instance 2 of 5, pool 64; step n200"
+  ]
+}

@@ -1,0 +1,36 @@
+[
+  {
+    "name": "signoz-services",
+    "path": "/services?relativeTime=6h",
+    "wait": 6000
+  },
+  {
+    "name": "signoz-service-map",
+    "path": "/service-map?relativeTime=6h",
+    "wait": 8000
+  },
+  {
+    "name": "trace-tidb5x-fanout-c16-i1",
+    "path": "/trace/222b8fb947011ae8a232bac73ff6fb66",
+    "wait": 6000,
+    "trace_id": "222b8fb947011ae8a232bac73ff6fb66",
+    "duration_ms": 79690.722932,
+    "run": "tidb5x-fanout-c16-i1"
+  },
+  {
+    "name": "trace-tidb5x-burst-n500-i1",
+    "path": "/trace/942a9e96fa07c36f860804965a2289dd",
+    "wait": 6000,
+    "trace_id": "942a9e96fa07c36f860804965a2289dd",
+    "duration_ms": 70550.285777,
+    "run": "tidb5x-burst-n500-i1"
+  },
+  {
+    "name": "trace-tidb5x-burst-p256-n1000-i2",
+    "path": "/trace/08d1e2391a632d754fb9abc370b9ebad",
+    "wait": 6000,
+    "trace_id": "08d1e2391a632d754fb9abc370b9ebad",
+    "duration_ms": 79064.217353,
+    "run": "tidb5x-burst-p256-n1000-i2"
+  }
+]

@@ -1,0 +1,77 @@
+{
+  "run_id": "temporal-gateway-resonate-postgres-burst-1792936172",
+  "system": "temporal-gateway",
+  "backend": "resonate-postgres",
+  "workload": "burst",
+  "params": {
+    "concurrency": 500,
+    "n": 500
+  },
+  "started": 0,
+  "completed": 0,
+  "failed": 0,
+  "retries": 0,
+  "wall_s": 0.0,
+  "throughput_wf_s": 0.0,
+  "latency": {
+    "n": 0,
+    "mean_ms": 0.0,
+    "p50_ms": 0.0,
+    "p95_ms": 0.0,
+    "p99_ms": 0.0,
+    "max_ms": 0.0
+  },
+  "steps": {
+    "activity": {
+      "n": 299,
+      "mean_ms": 24522.901345729097,
+      "p50_ms": 24061.066551,
+      "p95_ms": 29609.636494,
+      "p99_ms": 31077.298701,
+      "max_ms": 31259.631287
+    }
+  },
+  "sleep_lateness": null,
+  "requests": {},
+  "request_errors": 0,
+  "errors": {},
+  "resources": [
+    {
+      "target": "pid:1176751",
+      "cpu_avg_pct": 105.81952822336125,
+      "cpu_max_pct": 109.97622127136539,
+      "rss_avg_mb": 29.492123463114755,
+      "rss_max_mb": 31.50390625,
+      "samples": 61
+    },
+    {
+      "target": "pid:1176913",
+      "cpu_avg_pct": 7.718895218165427,
+      "cpu_max_pct": 36.99241507521298,
+      "rss_avg_mb": 25.65605788934426,
+      "rss_max_mb": 35.75390625,
+      "samples": 61
+    },
+    {
+      "target": "container:rbench-pg",
+      "cpu_avg_pct": 82.90820161344763,
+      "cpu_max_pct": 161.98249097265972,
+      "rss_avg_mb": 132.86936475409837,
+      "rss_max_mb": 169.390625,
+      "samples": 61
+    },
+    {
+      "target": "pid:1200036",
+      "cpu_avg_pct": 3.6709591472679124,
+      "cpu_max_pct": 26.994129613627056,
+      "rss_avg_mb": 73.40586577868852,
+      "rss_max_mb": 83.9765625,
+      "samples": 61
+    }
+  ],
+  "notes": [
+    "Temporal Go SDK 1.49.0 through the Loams Temporal gateway (DX1, loams dx1-t9-binary loams-temporal-267f1f441), history store postgres; Resonate resonate-loams-main-4656e2fd on Postgres 17.10; both databases in one rbench-pg container, data on ext4 (/mnt/Projects)",
+    "driver exited with Some(2)",
+    "driver printed no done record"
+  ]
+}

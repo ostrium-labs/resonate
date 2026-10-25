@@ -17,19 +17,27 @@ change the TiKV result (31 vs 37-49/s, within the host's noise). Two things are 
 
 - **durable timers fire late** after a 1 s sleep: TiKV store p50 2.5 s / p99 16 s on the final build (0.6 / 9.5 s on
   the WIP build in the quieter hour), SQLite 0.3 / 17 s, Postgres 0.1 / 0.8 s, the Loams 0.1.1 engine on TiKV
-  0.25 / 3.2 s, Temporal 0.04 / 4.6 s. The SQL stores' figures are affected by the timer-wheel bug FW10 found (fork
-  task FW11, not landed when these ran); the TiKV store's lateness is a separate open question for the fork;
+  0.25 / 3.2 s, Temporal 0.04 / 4.6 s. The SQL stores' figures were affected by the timer-wheel bug FW10 found; with the fix
+  merged (FW11, `0a68bc58`) SQLite's lateness fell to 5 ms / 1.4 s ([Timers after FW11](#timers-after-fw11)). The
+  TiKV store improved less (0.66 s / 13 s) and is a separate open question for the fork;
 - **the WIP FW1 build failed on a fresh TiKV**: the TiKV client gave up on region errors while the keyspace's first
   regions split (342 in one run: 3.7/s, p99 117 s, 3 failed workflows). The merged build had **no** region errors
   on a fresh cluster.
 
 **TiDB Cloud Starter is the free, zero-ops option.** All seven regions the API offers ran, twice, for $0: 19
-clusters were created with a spending limit of 0 and all 19 deleted, and the October bill reads $0. From this laptop
+clusters for those runs and 14 more for the five-instance run below (33 in all, spending limit 0), all 33 deleted,
+and the October bill reads $0. From this laptop
 in India it is slow: a fan-out workflow took 35-140 s at p50 and a one-step workflow 19-48 s, because every
 protocol request takes several MySQL round trips over the WAN and the traces show the 8 parallel step settles of a
 workflow serializing on the workflow's task row (each `mysql.transact` holding its lock for seconds). Those numbers
 say little about a Resonate server in the same cloud region as its Starter instance, which is how a hosted service
 would run.
+
+**Five Starter instances at full** ([`tidb-starter-5x/`](tidb-starter-5x/README.md), added 2026-10-25): five
+Resonate servers, one per free instance in Singapore, driven in parallel, did about **28 one-step workflows/s** and
+**1.1 fan-out workflows/s** combined. Starter never throttled: no error 8252 in any log. The ceiling was this
+laptop's connection pools and home network over a ~200 ms round trip. The free 250 M RU a month of five instances
+sustain about 340,000 fan-out or 1.7 M one-step workflows a month, which is 0.13 or 0.63 workflows/s on average.
 
 **Cost** ("if a hosted Resonate service were deployed on TiDB Starter vs on TiKV"): a fan-out workflow costs about
 740 Request Units on Starter, so the 50 M free RUs cover ~68,000 of them a month; beyond that 1 M cost $74
@@ -50,7 +58,7 @@ workflows/s and could not take 500 simultaneous Dag-run triggers (64 and 105 of 
 | Raw Resonate on SQLite and Postgres | ran, FW10 builds (server spans: gateway → `process` → `sqlite.transact`/`postgres.transact`) |
 | "TiKV + protocol gateway": the Loams 0.1.1 engine's Resonate endpoint `/durable/` on TiKV | ran (`ghcr.io/ostrium-labs/loams:0.1.1`), the gateway Loams ships today |
 | Stock Temporal 1.32.1 on Postgres (DX0 pins) | ran, Go SDK 1.49.0 |
-| **Temporal SDK through a Temporal-protocol gateway on Resonate** | **not run**: that gateway is DX1 work in ostrium-labs/loams and did not run an SDK workflow when these ran |
+| Temporal SDK through the Loams Temporal gateway (DX1) on Resonate | ran on 2026-10-25 (`loams-temporal` from loams `dx1-t9-binary` @ `267f1f441`, Postgres history store, Resonate `4656e2fd` on Postgres). Fan-out completed once (500/500); burst and chain hit a gateway bug (the Go SDK panics: "could not get last history event"). See [Temporal SDK via the gateway](#temporal-sdk-via-the-loams-temporal-gateway) |
 | Airflow 3.3.2 + Edge executor (DX0 pins) | ran |
 | **Airflow with a Resonate-backed executor** | **not run**: `LoamsResonateExecutor` (design 74 §9.3) does not exist yet |
 | SigNoz on Loams House | **not used**: loams#1176 and #1181 (the House changes SigNoz needs) were open; SigNoz ran on its own bundled ClickHouse instead |
@@ -145,6 +153,61 @@ deadline wheel falls behind (`resonate-timer-wheel`, default `WHEEL_CAPACITY=819
 had not landed when these ran, so these SQL timer numbers are not a property of the design. The TiKV store and the
 Loams 0.1.1 engine (TiKV) also fire late; that is not explained by FW11 and is reported to the fork lead.
 Temporal's timers fire about 1 s late at minimum by design (sub-second sleeps round up), which is why S = 1 s here.
+
+## Timers after FW11
+
+The fork's timer fix (FW11: an indexed wheel, firing before merging, up to 16 fires at once on the SQL stores)
+merged into `loams/main` as `0a68bc58` (PR #23). The chain workload was re-run on each store with that build
+(2026-10-25 17:45-17:48 UTC, load 14-21), and earlier with the PR's build (`791bc915`, 13:37-13:41 UTC, load
+16-42), next to the "before" runs of table A:
+
+| Store | Build | late p50 ms | p95 | p99 | max | chain wf/s | chain p50 ms | load1 | run |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---|
+| TiKV (FW1 store) | before: `loams/main` `b5177606` | 2,541 | 8,836 | 16,271 | 17,085 | 0.80 | 19,363 | 35.08 | [resonate-tikv-chain-1792916950](runs/resonate-tikv-chain-1792916950/) |
+| TiKV (FW1 store) | FW11 PR build `791bc915` | 171 | 1,984 | 4,763 | 6,819 | 2.35 | 7,034 | 41.71 | [resonate-tikv-chain-1792935605](after-fw11/runs/resonate-tikv-chain-1792935605/) |
+| TiKV (FW1 store) | **after: `loams/main` `0a68bc58` (FW11 merged)** | 661 | 7,449 | 12,812 | 13,572 | 1.43 | 9,839 | 15.20 | [resonate-tikv-chain-1792950413](after-fw11/runs/resonate-tikv-chain-1792950413/) |
+| Postgres | before: `loams/main` `b5177606` | 114 | 640 | 811 | 913 | 3.02 | 6,224 | 30.67 | [resonate-postgres-chain-1792916856](runs/resonate-postgres-chain-1792916856/) |
+| Postgres | FW11 PR build `791bc915` | 196 | 563 | 844 | 1,023 | 2.82 | 6,960 | 16.59 | [resonate-postgres-chain-1792935536](after-fw11/runs/resonate-postgres-chain-1792935536/) |
+| Postgres | **after: `loams/main` `0a68bc58` (FW11 merged)** | 138 | 752 | 6,252 | 6,311 | 2.54 | 7,494 | 17.82 | [resonate-postgres-chain-1792950349](after-fw11/runs/resonate-postgres-chain-1792950349/) |
+| SQLite | before: `loams/main` `b5177606` | 333 | 6,229 | 16,937 | 18,622 | 1.25 | 14,352 | 39.68 | [resonate-sqlite-chain-1792916684](runs/resonate-sqlite-chain-1792916684/) |
+| SQLite | FW11 PR build `791bc915` | 8 | 4,230 | 4,867 | 5,667 | 2.05 | 9,221 | 22.15 | [resonate-sqlite-chain-1792935470](after-fw11/runs/resonate-sqlite-chain-1792935470/) |
+| SQLite | **after: `loams/main` `0a68bc58` (FW11 merged)** | 6 | 1,300 | 1,396 | 1,495 | 3.21 | 5,457 | 21.05 | [resonate-sqlite-chain-1792950305](after-fw11/runs/resonate-sqlite-chain-1792950305/) |
+
+- **SQLite:** FW11 fixed it: late p50 5 ms, p99 1.4 s, down from 0.3 s / 17 s. Chain throughput went up 2.6×.
+- **Postgres:** it was not slow at p50 before FW11 (0.1-0.2 s) and still isn't. Its p99 moved between 0.8 s and
+  6.3 s from run to run, with the host's load.
+- **TiKV store:** better than before (p50 0.66 s, p99 13 s, against 2.5 s / 16 s), but still late. FW11 fixed the
+  SQL stores' wheel, and the TiKV store's timers are a separate path that is still open for the fork.
+
+Raw data in [`after-fw11/`](after-fw11/).
+
+## Temporal SDK via the Loams Temporal gateway
+
+DX1's gateway (`loams-temporal`, ostrium-labs/loams `dx1-t9-binary` @ `267f1f441`) serves the Temporal API on
+Resonate: history in its own Postgres database (migrated by the gateway, 64 shards), timers and leases in Resonate
+(`loams/main` `4656e2fd` on Postgres), both databases in the same Postgres 17.10 container as the other Postgres legs.
+The driver is the same Go SDK 1.49.0 binary as the stock-Temporal leg, pointed at the gateway
+(`bench/scripts/run-temporal-gateway.sh`).
+
+| Path | Workload | OK / started | wf/s | p50 ms | p99 ms | load1 | run |
+|---|---|---:|---:|---:|---:|---:|---|
+| Go SDK → Loams Temporal gateway → Resonate (Postgres) | fanout | 500/500 | 1.31 | 15,730 | 28,159 | 25.73 | [temporal-gateway-resonate-postgres-fanout-1792935789](runs/temporal-gateway-resonate-postgres-fanout-1792935789/) |
+| Go SDK → Loams Temporal gateway → Resonate (Postgres) | fanout (driver panicked) | 220/220 | 0.95 | 21,731 | 42,064 | 39.45 | [temporal-gateway-resonate-postgres-fanout-1792949374](runs/temporal-gateway-resonate-postgres-fanout-1792949374/) |
+| Go SDK → Loams Temporal gateway → Resonate (Postgres) | burst (driver panicked) | 0/0 | 0.00 | 0 | 0 | 15.00 | [temporal-gateway-resonate-postgres-burst-1792936172](runs/temporal-gateway-resonate-postgres-burst-1792936172/) |
+| Go SDK → Loams Temporal gateway → Resonate (Postgres) | chain (driver panicked) | 0/0 | 0.00 | 0 | 0 | 14.60 | [temporal-gateway-resonate-postgres-chain-1792936234](runs/temporal-gateway-resonate-postgres-chain-1792936234/) |
+| Go SDK → stock Temporal 1.32.1 (Postgres) | fanout | 498/500 | 7.00 | 583 | 35,276 | 9.89 | [temporal-postgres-fanout-1792949060](runs/temporal-postgres-fanout-1792949060/) |
+| Go SDK → stock Temporal 1.32.1 (Postgres) | burst | 500/500 | 8.01 | 25,707 | 50,310 | 27.99 | [temporal-postgres-burst-1792949137](runs/temporal-postgres-burst-1792949137/) |
+| Go SDK → stock Temporal 1.32.1 (Postgres) | fanout | 500/500 | 9.09 | 1,555 | 8,096 | 18.39 | [temporal-postgres-fanout-1792876726](runs/temporal-postgres-fanout-1792876726/) |
+| Go SDK → stock Temporal 1.32.1 (Postgres) | burst | 500/500 | 37.62 | 7,888 | 11,775 | 22.29 | [temporal-postgres-burst-1792876832](runs/temporal-postgres-burst-1792876832/) |
+
+- **Fan-out** ran: 500/500 at 1.3 workflows/s (p50 16 s). Stock Temporal on the same Postgres image did 7-9 wf/s.
+- **The repeat stopped at 220 workflows:** the Go SDK panicked in the starter with "could not get last history
+  event for workflow", which `run.Get` raises when the gateway's GetWorkflowExecutionHistory long-poll answers
+  without the close event.
+- **Burst and chain** hit the same panic at the start, so they have no numbers. This is reported to the DX1 lead;
+  DX1 is the gateway's MVP (no sticky queues, one replica).
+- **Not like for like:** the gateway rows and the last two stock rows are from different hours. The two stock rows
+  of 17:23 UTC are from the same evening as the gateway's second run.
 
 ## Cost
 

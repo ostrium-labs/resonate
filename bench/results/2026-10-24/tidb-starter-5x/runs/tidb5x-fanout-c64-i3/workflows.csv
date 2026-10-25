@@ -1,0 +1,129 @@
+wf_id,start_ns,end_ns,latency_ms,ok,retries,error
+tidb5x-fanout-c64-i3-60,1792934125192932165,1792934160409789840,35216.858,false,0,fence create 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-56,1792934125148695731,1792934160411509524,35262.814,false,0,fence create 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-58,1792934125171280966,1792934160414147056,35242.866,false,0,fence create 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-51,1792934125116652949,1792934160530093590,35413.441,false,0,fence create 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-54,1792934125127075514,1792934160530576343,35403.501,false,0,fence create 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-20,1792934124732279189,1792934160707545580,35975.266,false,0,fence create 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-11,1792934124689395374,1792934160806476321,36117.081,false,0,fence create 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-17,1792934124699186568,1792934160849457984,36150.271,false,0,fence create 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-5,1792934124688108862,1792934160849523872,36161.415,false,0,fence create 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-22,1792934124754107690,1792934160941604500,36187.497,false,0,fence create 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-34,1792934124929235632,1792934160941976877,36012.741,false,0,fence create 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-31,1792934124929027019,1792934160942801018,36013.774,false,0,fence create 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-26,1792934124927825621,1792934160942816582,36014.991,false,0,fence create 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-45,1792934125116155448,1792934160950594702,35834.439,false,0,fence create 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-19,1792934124720999973,1792934160950640775,36229.641,false,0,fence create 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-32,1792934124929190011,1792934160950851776,36021.662,false,0,fence create 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-36,1792934124929447075,1792934160966852426,36037.405,false,0,fence create 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-37,1792934124929801419,1792934160966856011,36037.055,false,0,fence create 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-41,1792934125115525315,1792934161046894187,35931.369,false,0,fence create 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-59,1792934125182561242,1792934161090972649,35908.411,false,0,fence create 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-55,1792934125138389773,1792934161091593622,35953.204,false,0,fence create 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-24,1792934124927506021,1792934161122336427,36194.830,false,0,fence create 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-27,1792934124927992709,1792934161143349757,36215.357,false,0,fence create 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-33,1792934124929207137,1792934161293590723,36364.384,false,0,fence create 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-23,1792934124927478230,1792934161294089932,36366.612,false,0,fence create 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-44,1792934125116132673,1792934161429277246,36313.145,false,0,fence create 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-53,1792934125116759473,1792934161440598917,36323.839,false,0,fence create 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-61,1792934125204179759,1792934161698224565,36494.045,false,0,fence create 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-52,1792934125116716794,1792934161698253418,36581.537,false,0,fence create 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-62,1792934125215135421,1792934162601282643,37386.147,false,0,fence create 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-63,1792934125226910358,1792934163018331988,37791.422,false,0,fence create 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-4,1792934124687928876,1792934183574795689,58886.867,false,0,fence settle 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-7,1792934124688459738,1792934183777809328,59089.350,false,0,fence settle 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-15,1792934124689642811,1792934185846858365,61157.216,false,0,fence settle 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-8,1792934124688731322,1792934186646691254,61957.960,false,0,fence settle 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-25,1792934124927700959,1792934187459259614,62531.559,false,0,fence settle 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-0,1792934124467471574,1792934188093393705,63625.922,false,0,fence settle 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-29,1792934124928677406,1792934189127826029,64199.149,false,0,fence settle 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-16,1792934124689657820,1792934189273986905,64584.329,false,0,fence settle 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-10,1792934124689363928,1792934190074128403,65384.764,false,0,fence settle 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-86,1792934161143368740,1792934191144256488,30000.888,false,0,task.create 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-88,1792934161294109069,1792934191296029780,30001.921,false,0,task.create 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-87,1792934161293622947,1792934191296032877,30002.410,false,0,task.create 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-89,1792934161429301544,1792934191430650815,30001.349,false,0,task.create 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-90,1792934161440617391,1792934191442261449,30001.644,false,0,task.create 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-91,1792934161698264014,1792934191700906285,30002.642,false,0,task.create 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-92,1792934161698275180,1792934191700914588,30002.639,false,0,task.create 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-6,1792934124688327873,1792934191845252171,67156.924,false,0,fence settle 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-93,1792934162601306303,1792934192602558822,30001.253,false,0,task.create 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-94,1792934163030026540,1792934193032025317,30001.999,false,0,task.create 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-14,1792934124689513887,1792934193136685287,68447.171,false,0,fence settle 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-35,1792934124929301054,1792934193423023538,68493.722,false,0,fence settle 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-28,1792934124928548755,1792934194793035608,69864.487,false,0,fence settle 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-46,1792934125116178283,1792934196353948578,71237.770,false,0,fence create 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-30,1792934124928695638,1792934198154156797,73225.461,false,0,fence settle 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-1,1792934124477816818,1792934198606484882,74128.668,false,0,fence settle 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-3,1792934124687811472,1792934198974704376,74286.893,false,0,fence settle 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-12,1792934124689489428,1792934200579955640,75890.466,false,0,fence settle 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-48,1792934125116410435,1792934201343068688,76226.658,false,0,fence settle 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-21,1792934124743520076,1792934201374907619,76631.388,false,0,fence settle 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-47,1792934125116207533,1792934201597572440,76481.365,false,0,fence create 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-42,1792934125115661005,1792934202453403037,77337.742,false,0,fence settle 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-13,1792934124689497547,1792934203036975201,78347.478,false,0,fence settle 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-40,1792934125115157039,1792934204061559897,78946.403,false,0,fence settle 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-9,1792934124689291115,1792934204286483603,79597.192,false,0,fence settle 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-43,1792934125115944537,1792934205494052105,80378.108,false,0,fence settle 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-39,1792934125115006284,1792934208152381387,83037.375,false,0,fence settle 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-57,1792934125159979370,1792934208804177169,83644.198,false,0,fence settle 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-50,1792934125116626813,1792934213647938452,88531.312,false,0,fence create 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-116,1792934202493481884,1792934232495939962,30002.458,false,0,task.create 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-119,1792934204286527427,1792934234288842289,30002.315,false,0,task.create 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-120,1792934205494102512,1792934235495977777,30001.875,false,0,task.create 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-2,1792934124687781626,1792934235807743457,111119.962,true,0,
+tidb5x-fanout-c64-i3-121,1792934208152405454,1792934238153618502,30001.213,false,0,task.create 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-49,1792934125116498684,1792934238568966711,113452.468,false,1,fence settle 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-67,1792934160530118501,1792934242211263180,81681.145,false,0,fence settle 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-64,1792934160409825976,1792934243997951750,83588.126,false,0,fence settle 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-65,1792934160411546277,1792934247282857233,86871.311,false,0,fence settle 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-68,1792934160530590791,1792934248301668151,87771.077,false,0,fence settle 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-38,1792934125024431522,1792934249219107058,124194.676,true,0,
+tidb5x-fanout-c64-i3-66,1792934160414167281,1792934254816734300,94402.567,false,0,fence settle 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-72,1792934160849560892,1792934261177762039,100328.201,false,0,fence settle 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-75,1792934160942814035,1792934261775474160,100832.660,false,0,fence settle 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-73,1792934160941629348,1792934262673116588,101731.487,false,0,fence settle 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-69,1792934160707570756,1792934263164359809,102456.789,false,0,fence settle 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-81,1792934160966887089,1792934263343112639,102376.226,false,0,fence settle 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-101,1792934189127860225,1792934264069508428,74941.648,false,0,fence create 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-70,1792934160806498015,1792934264278708148,103472.210,false,0,fence settle 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-102,1792934189274048689,1792934265288512796,76014.464,false,0,fence create 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-80,1792934160966886566,1792934266465261475,105498.375,false,0,fence settle 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-84,1792934161091610508,1792934267206104511,106114.494,false,0,fence settle 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-104,1792934191845335554,1792934268294869950,76449.534,false,0,fence create 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-83,1792934161091011801,1792934268578229999,107487.218,false,0,fence settle 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-82,1792934161046918854,1792934269443527380,108396.609,false,0,fence settle 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-98,1792934186646760613,1792934269443914661,82797.154,false,0,fence settle 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-85,1792934161122354799,1792934269600372343,108478.018,false,0,fence settle 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-97,1792934185846896869,1792934270988884177,85141.987,false,0,fence settle 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-95,1792934183574889164,1792934271159737565,87584.848,false,0,fence create 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-96,1792934183777858201,1792934271852662829,88074.805,false,0,fence settle 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-79,1792934160950863698,1792934272191850716,111240.987,false,0,fence settle 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-103,1792934190074235835,1792934272467866179,82393.630,false,0,fence settle 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-100,1792934188093466284,1792934283044748061,94951.282,false,0,fence settle 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-76,1792934160942835995,1792934284087998924,123145.163,true,0,
+tidb5x-fanout-c64-i3-77,1792934160950615321,1792934284945120628,123994.505,true,0,
+tidb5x-fanout-c64-i3-74,1792934160941994339,1792934284986362744,124044.368,true,0,
+tidb5x-fanout-c64-i3-106,1792934193423072743,1792934285161836275,91738.764,false,0,fence settle 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-105,1792934193136723597,1792934285934434534,92797.711,false,0,fence settle 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-99,1792934187459324056,1792934286350827649,98891.504,false,0,fence settle 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-78,1792934160950657031,1792934286421658786,125471.002,true,0,
+tidb5x-fanout-c64-i3-114,1792934201375027394,1792934286640071259,85265.044,false,0,fence create 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-111,1792934198974764390,1792934286715648208,87740.884,false,0,fence create 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-115,1792934201597616144,1792934286784553337,85186.937,false,0,fence create 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-71,1792934160849483171,1792934287313207127,126463.724,true,0,
+tidb5x-fanout-c64-i3-113,1792934201343090567,1792934290096229884,88753.139,false,0,fence create 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-112,1792934200580035426,1792934293350287426,92770.252,false,0,fence create 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-117,1792934203037008902,1792934294063762857,91026.754,false,0,fence create 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-109,1792934198154189918,1792934294533286147,96379.096,true,0,
+tidb5x-fanout-c64-i3-123,1792934213647973947,1792934294583598079,80935.624,false,0,fence create 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-118,1792934204061605035,1792934294603778689,90542.174,false,0,fence create 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-108,1792934196353969897,1792934294678695801,98324.726,true,0,
+tidb5x-fanout-c64-i3-110,1792934198606527332,1792934297022518610,98415.991,true,0,
+tidb5x-fanout-c64-i3-107,1792934194793065009,1792934299397628791,104604.564,true,0,
+tidb5x-fanout-c64-i3-122,1792934208804198029,1792934302374710244,93570.512,true,0,
+tidb5x-fanout-c64-i3-124,1792934235807764562,1792934309537013930,73729.249,true,0,
+tidb5x-fanout-c64-i3-125,1792934238568993279,1792934311168207373,72599.214,true,0,
+tidb5x-fanout-c64-i3-126,1792934249219123856,1792934313831639768,64612.516,true,0,
+tidb5x-fanout-c64-i3-18,1792934124709676378,1792934384090206006,259380.530,false,5,fence settle 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-c64-i3-127,1792934384168673485,1792934425962739021,41794.066,true,0,

@@ -1,0 +1,10 @@
+{
+  "kept_spans": {
+    "resonate-tidb5x/resonate-server-tidb5x-1": 39514,
+    "resonate-tidb5x/resonate-server-tidb5x-2": 54572,
+    "resonate-tidb5x/resonate-server-tidb5x-3": 37596,
+    "resonate-tidb5x/resonate-server-tidb5x-4": 38265,
+    "resonate-tidb5x/resonate-server-tidb5x-5": 39496
+  },
+  "dropped_spans_other_services": 7996015
+}
