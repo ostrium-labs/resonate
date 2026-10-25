@@ -171,6 +171,105 @@ services:
       resonate:
         aliases: [resonate-server]
 
+  resonate-server-tidb:
+    build: .
+    profiles: [tidb]
+    ports:
+      - "8001:8001"   # the protocol, the poll endpoint and the console
+      - "9090:9090"   # prometheus
+    environment:
+      - RESONATE_GATEWAYS__GATEWAY_HTTP__BIND=0.0.0.0:8001
+      - RESONATE_GATEWAYS__GATEWAY_METRICS__BIND=0.0.0.0:9090
+      - RESONATE_LEVEL=info
+      # TiDB through the MySQL plugin, which pins tidb_txn_mode=pessimistic
+      # per session. `test` is the database a fresh TiDB has.
+      - RESONATE_SERVERS__ACTIVE=server_mysql
+      - RESONATE_SERVERS__SERVER_MYSQL__URL=mysql://root@tidb:4000/test
+      - RESONATE_SERVERS__SERVER_MYSQL__POOL_SIZE=20
+    depends_on:
+      tidb:
+        condition: service_started
+    restart: on-failure   # until TiDB accepts connections
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8001/ready || exit 1"]
+      interval: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      resonate:
+        aliases: [resonate-server]
+
+  resonate-server-tikv:
+    build: .
+    profiles: [tikv]
+    ports:
+      - "8001:8001"   # the protocol, the poll endpoint and the console
+      - "9090:9090"   # prometheus
+    environment:
+      - RESONATE_GATEWAYS__GATEWAY_HTTP__BIND=0.0.0.0:8001
+      - RESONATE_GATEWAYS__GATEWAY_METRICS__BIND=0.0.0.0:9090
+      - RESONATE_LEVEL=info
+      # The blob server on TiKV (resonate-server-tikv). The keyspace is
+      # created through PD's HTTP API when it is missing.
+      - RESONATE_SERVERS__ACTIVE=server_tikv
+      - RESONATE_SERVERS__SERVER_TIKV__PD=["pd:2379"]
+      - RESONATE_SERVERS__SERVER_TIKV__KEYSPACE=resonate
+      - RESONATE_SERVERS__SERVER_TIKV__ROOT=compose/
+    depends_on:
+      tikv:
+        condition: service_started
+    restart: on-failure   # until PD and TiKV are up
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8001/ready || exit 1"]
+      interval: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      resonate:
+        aliases: [resonate-server]
+
+  tidb:
+    image: pingcap/tidb:v8.5.8   # embedded storage (unistore): for development
+    profiles: [tidb]
+    ports:
+      - "4000:4000"
+    networks:
+      - resonate
+
+  pd:
+    image: pingcap/pd:v8.5.8
+    profiles: [tikv]
+    command:
+      - --name=pd
+      - --data-dir=/data/pd
+      - --config=/etc/pd.toml
+      - --client-urls=http://0.0.0.0:2379
+      - --advertise-client-urls=http://pd:2379
+      - --peer-urls=http://0.0.0.0:2380
+      - --advertise-peer-urls=http://pd:2380
+      - --initial-cluster=pd=http://pd:2380
+    volumes:
+      - ./test/tikv/pd.toml:/etc/pd.toml:ro
+    networks:
+      - resonate
+
+  tikv:
+    image: pingcap/tikv:v8.5.8
+    profiles: [tikv]
+    command:
+      - --addr=0.0.0.0:20160
+      - --advertise-addr=tikv:20160
+      - --status-addr=0.0.0.0:20180
+      - --data-dir=/data/tikv
+      - --pd=pd:2379
+      - --config=/etc/tikv.toml   # API v2 (keyspaces), see test/tikv/
+    volumes:
+      - ./test/tikv/tikv.toml:/etc/tikv.toml:ro
+    depends_on:
+      - pd
+    networks:
+      - resonate
+
   mysql:
     image: mysql:8.0
     profiles: [mysql, mysql-auth]
