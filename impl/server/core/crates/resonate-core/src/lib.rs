@@ -8,6 +8,7 @@
 
 pub mod address;
 pub mod gateway;
+pub mod retention;
 pub mod router;
 pub mod server;
 pub mod types;

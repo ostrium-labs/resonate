@@ -24,7 +24,9 @@
 //! are TEXT[] columns here because Postgres has arrays.
 
 use async_trait::async_trait;
+use resonate_core::retention::Retention;
 use resonate_sql::engine::{Engine, Input, Outgoing, Output, Scheduled, Timeout};
+use resonate_sql::retention::{self, CountGate, Dialect, PruneReport};
 use resonate_sql::{
     PromiseCreateParams, PromiseCreateResult, PromiseSettleParams, PromiseSettleResult,
     RegisterCallbackResult, ScheduleCreateParams, StorageError, StorageResult, TaskAcquireParams,
@@ -60,7 +62,15 @@ pub struct PostgresEngine {
     preload_limit: u32,
     /// Whether `debug.*` operations are permitted at all.
     debug: bool,
+    /// The retention policy, when one is configured. Its schema exists
+    /// exactly when this is `Some`.
+    retention: Option<std::sync::Arc<Retention>>,
+    /// When a pass last counted the live tombstones.
+    count_gate: CountGate,
 }
+
+/// Retention's table and indexes, applied by [`PostgresEngine::with_retention`].
+const RETENTION_SCHEMA: &str = include_str!("../retention.sql");
 
 /// The promise columns every read projects. `param_headers`/`value_headers` are
 /// `NOT NULL DEFAULT '{}'` here (the catalogue's
@@ -142,7 +152,25 @@ impl PostgresEngine {
             task_retry_timeout,
             preload_limit,
             debug,
+            retention: None,
+            count_gate: CountGate::default(),
         })
+    }
+
+    /// Turn retention on (FW5): create its schema, and from then on prune on
+    /// [`Engine::prune`] and answer `expired` for every tombstoned id. Run
+    /// after [`PostgresEngine::init`], which creates the tables it indexes.
+    /// `None` leaves the engine as it was.
+    pub async fn with_retention(mut self, retention: Option<Retention>) -> Result<Self, sqlx::Error> {
+        let Some(policy) = retention else {
+            return Ok(self);
+        };
+        policy.validate().map_err(|e| {
+            sqlx::Error::Configuration(format!("retention: {e}").into())
+        })?;
+        sqlx::raw_sql(RETENTION_SCHEMA).execute(&self.pool).await?;
+        self.retention = Some(std::sync::Arc::new(policy));
+        Ok(self)
     }
 
     /// Migrate the schema, constraints and all.
@@ -215,11 +243,13 @@ impl PostgresEngine {
 
                 let task_retry_timeout = self.task_retry_timeout;
                 let preload_limit = self.preload_limit;
+                let retention = self.retention.is_some();
                 let (result, emitted, armed, tx) = tokio::task::block_in_place(|| {
                     let db = PostgresDb {
                         tx: UnsafeCell::new(tx),
                         task_retry_timeout,
                         preload_limit,
+                        retention,
                         emitted: RefCell::new(Vec::new()),
                         armed: RefCell::new(Vec::new()),
                     };
@@ -290,12 +320,41 @@ impl PostgresEngine {
     where
         F: FnMut(&PostgresDb) -> StorageResult<ResponseEnvelope> + Send + 'static,
     {
+        // Retention: the ids this request names are checked against the
+        // tombstones AFTER the operation ran, in its transaction. Under READ
+        // COMMITTED that statement sees every prune committed before it, and a
+        // prune that commits later found the row this operation left (a
+        // create waits on the prune's delete of the same key), so a hit here
+        // rolls back whatever the operation wrote and answers `expired`.
+        let subjects = match &self.retention {
+            Some(_) => resonate_core::retention::subject_ids(&req.kind, &req.data),
+            None => Vec::new(),
+        };
+        let mut f = f;
+        let f = move |db: &PostgresDb| {
+            let response = f(db)?;
+            if !subjects.is_empty() && response.head.status != 400 {
+                if let Some(id) = db.tombstoned(&subjects)? {
+                    return Err(StorageError::Expired(id));
+                }
+            }
+            Ok(response)
+        };
         match self.transact(f).await {
             Ok((response, messages, timeouts)) => Output {
                 response: Some(response),
                 messages,
                 timeouts,
             },
+            Err(StorageError::Expired(id)) => {
+                tracing::debug!(promise_id = %id, kind = %req.kind, "Request names a pruned id");
+                Output::response(ResponseEnvelope::error(
+                    req.kind.clone(),
+                    req.head.corr_id.clone(),
+                    resonate_core::retention::EXPIRED_STATUS,
+                    resonate_core::retention::EXPIRED_MESSAGE,
+                ))
+            }
             Err(StorageError::InvalidInput(msg)) => Output::response(ResponseEnvelope::error(
                 req.kind.clone(),
                 req.head.corr_id.clone(),
@@ -2404,10 +2463,22 @@ impl PostgresEngine {
             }
         }
 
-        match self
+        let swept = self
             .transact(move |db| process_all_timeouts(db, time).map(|_| ()))
-            .await
-        {
+            .await;
+        // Under debug no sweep runs, so a tick is also when retention runs:
+        // passes until one comes back short, as the sweep loop does.
+        if swept.is_ok() {
+            if let Err(e) = self.prune_until_short(time).await {
+                return Output::response(ResponseEnvelope::error(
+                    req.kind.clone(),
+                    req.head.corr_id.clone(),
+                    500,
+                    &format!("Tick failed: {}", e),
+                ));
+            }
+        }
+        match swept {
             Ok(((), messages, timeouts)) => Output {
                 response: Some(ResponseEnvelope::new(
                     req.kind.clone(),
@@ -2434,6 +2505,8 @@ struct PostgresDb<'a> {
     tx: UnsafeCell<sqlx::Transaction<'a, sqlx::Postgres>>,
     task_retry_timeout: i64,
     preload_limit: u32,
+    /// Whether retention is on, and so whether its table exists.
+    retention: bool,
     /// What this transition has emitted so far. See `engine_sqlite.rs`
     /// — same reasoning, and the same reason it is not in a return type.
     emitted: RefCell<Vec<Outgoing>>,
@@ -4312,6 +4385,7 @@ impl PostgresDb<'_> {
                 0,
                 CASE WHEN s.address IS NOT NULL AND NOT s.already_timedout THEN $5 + {trt} END
               FROM schedule s
+              {tombstone_guard}
               ON CONFLICT (id) DO NOTHING
               RETURNING *
             ),
@@ -4333,7 +4407,14 @@ impl PostgresDb<'_> {
                    (SELECT already_timedout FROM schedule) AS promise_already_timedout,
                    {messages}
             FROM updated_schedule
-        ", messages = emitted_json(&["emit_new"])))
+        ", messages = emitted_json(&["emit_new"]),
+           // An occurrence whose promise retention pruned is not created
+           // again: it already ran. The schedule still advances.
+           tombstone_guard = if self.retention {
+               "WHERE NOT EXISTS (SELECT 1 FROM promise_tombstones t WHERE t.id = s.computed_promise_id)"
+           } else {
+               ""
+           }))
             .bind(schedule_id).bind(fired_at).bind(next_run_at).bind(promise_tags_json).bind(time)
             .fetch_all(self.tx().as_mut()))?;
 
@@ -4367,7 +4448,135 @@ impl PostgresDb<'_> {
         rt_block_on(
             sqlx::raw_sql("TRUNCATE promises, schedules CASCADE").execute(self.tx().as_mut()),
         )?;
+        if self.retention {
+            rt_block_on(
+                sqlx::raw_sql("TRUNCATE promise_tombstones").execute(self.tx().as_mut()),
+            )?;
+        }
         Ok(())
+    }
+
+    /// The first of `ids` that holds a tombstone, if any. A tombstone past its
+    /// horizon still answers until a pass drops it: the reservation lasts at
+    /// least the horizon, never less.
+    fn tombstoned(&self, ids: &[String]) -> StorageResult<Option<String>> {
+        if !self.retention {
+            return Ok(None);
+        }
+        let found: Option<String> = rt_block_on(
+            sqlx::query_scalar("SELECT id FROM promise_tombstones WHERE id = ANY($1) LIMIT 1")
+                .bind(ids)
+                .fetch_optional(self.tx().as_mut()),
+        )?;
+        Ok(found)
+    }
+
+    /// One retention pass at `now`. See `resonate_sql::retention`.
+    ///
+    /// Candidates are locked `FOR UPDATE SKIP LOCKED`, so a pass never waits
+    /// on a promise a request holds and two instances' passes never take the
+    /// same row. A settled promise acquires no new listener, callback or
+    /// resume (registration against it answers at once), so the conditions
+    /// the candidate query checked still hold when its rows are deleted.
+    fn prune(&self, policy: &Retention, now: i64, count: bool) -> StorageResult<PruneReport> {
+        let cutoff = retention::max_cutoff(policy, now);
+        let expires_at = now.saturating_add(policy.horizon());
+        let batch = policy.batch as i64;
+        // The tombstone, the strike from awaiters' lists, and the delete, over
+        // whichever candidates `{candidates}` selects.
+        let statement = |candidates: String| {
+            format!(
+                "WITH candidates AS ({candidates}),
+                 tombstoned AS (
+                   INSERT INTO promise_tombstones (id, pruned_at, expires_at)
+                   SELECT id, $1, $2 FROM candidates
+                   ON CONFLICT (id) DO UPDATE
+                     SET pruned_at = EXCLUDED.pruned_at, expires_at = EXCLUDED.expires_at
+                   RETURNING id
+                 ),
+                 struck AS (
+                   UPDATE promises q
+                   SET callbacks = ARRAY(SELECT x FROM unnest(q.callbacks) x
+                                         WHERE x NOT IN (SELECT id FROM candidates))
+                   WHERE q.callbacks && ARRAY(SELECT id FROM candidates)
+                   RETURNING q.id
+                 ),
+                 deleted AS (
+                   DELETE FROM promises WHERE id IN (SELECT id FROM candidates) RETURNING id
+                 )
+                 SELECT (SELECT count(*) FROM deleted) AS pruned,
+                        (SELECT count(*) FROM tombstoned) AS tombstoned,
+                        (SELECT count(*) FROM struck) AS struck"
+            )
+        };
+        // Settled rows. A promise in an open task's `resumes` is one whose
+        // settlement that task has not consumed yet, so it stays; the open
+        // tasks are read through `idx_promises_task`, not the table.
+        let settled = format!(
+            "SELECT id FROM promises p
+             WHERE p.state <> 'pending' AND p.settled_at <= {cutoff}
+               AND (p.task_state IS NULL OR p.task_state = 'fulfilled')
+               AND cardinality(p.callbacks) = 0 AND cardinality(p.listeners) = 0
+               AND {selects}
+               AND p.id NOT IN (
+                 SELECT unnest(o.resumes) FROM promises o
+                 WHERE o.task_state IN ('pending', 'acquired', 'suspended', 'halted'))
+             ORDER BY p.settled_at LIMIT {batch}
+             FOR UPDATE OF p SKIP LOCKED",
+            selects = retention::selection(Dialect::Postgres, policy, now, "p.settled_at"),
+        );
+        let row = rt_block_on(
+            sqlx::query(&statement(settled))
+                .bind(now)
+                .bind(expires_at)
+                .fetch_one(self.tx().as_mut()),
+        )?;
+        let mut pruned: i64 = row.get("pruned");
+        if pruned < batch {
+            // Internal promises past their deadline: nothing can wait on one,
+            // so it has no task, listener or callback to check.
+            let lapsed = format!(
+                "SELECT id FROM promises p
+                 WHERE p.state = 'pending' AND NOT p.external AND p.timeout_at <= {cutoff}
+                   AND {selects}
+                 ORDER BY p.timeout_at LIMIT {left}
+                 FOR UPDATE OF p SKIP LOCKED",
+                selects = retention::selection(Dialect::Postgres, policy, now, "p.timeout_at"),
+                left = batch - pruned,
+            );
+            let row = rt_block_on(
+                sqlx::query(&statement(lapsed))
+                    .bind(now)
+                    .bind(expires_at)
+                    .fetch_one(self.tx().as_mut()),
+            )?;
+            pruned += row.get::<i64, _>("pruned");
+        }
+        let expired = rt_block_on(
+            sqlx::query(
+                "DELETE FROM promise_tombstones WHERE id IN (
+                   SELECT id FROM promise_tombstones WHERE expires_at <= $1
+                   ORDER BY expires_at LIMIT $2 FOR UPDATE SKIP LOCKED)",
+            )
+            .bind(now)
+            .bind(batch)
+            .execute(self.tx().as_mut()),
+        )?
+        .rows_affected();
+        let live = if count {
+            let n: i64 = rt_block_on(
+                sqlx::query_scalar("SELECT count(*) FROM promise_tombstones")
+                    .fetch_one(self.tx().as_mut()),
+            )?;
+            Some(n as u64)
+        } else {
+            None
+        };
+        Ok(PruneReport {
+            pruned: pruned as u64,
+            expired,
+            live,
+        })
     }
 
     // Timeout processing — three sequential statements, as in the multi-table
@@ -4666,9 +4875,39 @@ impl Engine for PostgresEngine {
     fn returns_messages(&self) -> bool {
         true
     }
+
+    async fn prune(&self, now: i64) -> StorageResult<PruneReport> {
+        let Some(policy) = self.retention.clone() else {
+            return Ok(PruneReport::default());
+        };
+        let count = self.count_gate.due(now);
+        self.transact(move |db| db.prune(&policy, now, count))
+            .await
+            .map(|(report, _, _)| report)
+    }
+
+    fn retention(&self) -> Option<&Retention> {
+        self.retention.as_deref()
+    }
 }
 
 impl PostgresEngine {
+    /// Retention passes at `now` until one comes back short of a full batch,
+    /// recording each. What `debug.tick` runs, since under debug there is no
+    /// sweep loop to run them.
+    async fn prune_until_short(&self, now: i64) -> StorageResult<()> {
+        let Some(batch) = self.retention.as_ref().map(|r| r.batch) else {
+            return Ok(());
+        };
+        loop {
+            let report = Engine::prune(self, now).await?;
+            retention::record(&report);
+            if !report.full(batch) {
+                return Ok(());
+            }
+        }
+    }
+
     /// Fire one timeout the system asked of itself. See `persistence_sqlite.rs`.
     async fn fire(&self, timeout: Timeout, now: i64) -> Output {
         let swept = match timeout {
@@ -4755,6 +4994,11 @@ pub struct Config {
     /// this runs.
     #[serde(default = "default_sweep_interval")]
     pub sweep_interval: u64,
+
+    /// Settled-promise retention (`[servers.server_postgres.retention]`). Off
+    /// when absent. See `docs/protocol-profile.md`, "Retention".
+    #[serde(default)]
+    pub retention: Option<Retention>,
 }
 
 fn default_preload_limit() -> u32 {
@@ -4788,6 +5032,7 @@ impl Default for Config {
             wheel_capacity: default_wheel_capacity(),
             wheel_refresh: default_wheel_refresh(),
             sweep_interval: default_sweep_interval(),
+            retention: None,
         }
     }
 }
@@ -4801,6 +5046,9 @@ fn configure(
     let config: Config = settings.extract()?;
     if config.url.is_empty() {
         return Err(settings.reject("url", "a connection URL is required"));
+    }
+    if let Some(r) = &config.retention {
+        r.validate().map_err(|e| settings.reject("retention", &e))?;
     }
 
     let options = resonate_sql::server::Options {
@@ -4826,6 +5074,10 @@ fn configure(
                     .init(open.migrate)
                     .await
                     .map_err(|e| resonate_plugin::Unavailable::new(format!("schema: {e}")))?;
+                let engine = engine
+                    .with_retention(open.retention.clone())
+                    .await
+                    .map_err(|e| resonate_plugin::Unavailable::new(format!("retention schema: {e}")))?;
                 Ok(std::sync::Arc::new(engine) as std::sync::Arc<dyn resonate_sql::engine::Engine>)
             })
         }),

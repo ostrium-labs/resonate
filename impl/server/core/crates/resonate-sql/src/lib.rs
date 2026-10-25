@@ -23,6 +23,7 @@ pub mod deadlines;
 pub mod engine;
 pub mod metrics;
 pub mod migrate;
+pub mod retention;
 pub mod server;
 pub mod sweep;
 
@@ -126,6 +127,11 @@ pub enum StorageError {
     /// The request contains a field that violates a storage-level constraint
     /// (e.g. a VARCHAR(255) column in MySQL). The caller should return 400.
     InvalidInput(String),
+    /// The request names a promise id that retention pruned and whose
+    /// tombstone is still live. Raised after the operation ran, inside its
+    /// transaction, so that whatever it wrote rolls back; the caller answers
+    /// `resonate_core::retention::EXPIRED_STATUS`. Carries the id.
+    Expired(String),
 }
 
 impl std::fmt::Display for StorageError {
@@ -134,6 +140,7 @@ impl std::fmt::Display for StorageError {
             StorageError::Backend(msg) => write!(f, "Storage error: {}", msg),
             StorageError::Serialization => write!(f, "Serialization conflict"),
             StorageError::InvalidInput(msg) => write!(f, "Invalid input: {}", msg),
+            StorageError::Expired(id) => write!(f, "Expired: {} was pruned by retention", id),
         }
     }
 }

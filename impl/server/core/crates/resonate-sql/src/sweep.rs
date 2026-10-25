@@ -27,10 +27,24 @@ pub async fn run(
     mut shutdown: tokio::sync::watch::Receiver<bool>,
 ) {
     let interval = Duration::from_millis(interval_ms);
+    // Retention rides the same loop at its own cadence: a pass is a bounded
+    // transaction, so it waits for nothing the sweep holds and nothing waits
+    // for it. Read once — the policy is the engine's, fixed at open.
+    let retention_every = server
+        .upgrade()
+        .and_then(|s| s.engine().ok().and_then(|e| e.retention().map(|r| r.interval)))
+        .map(Duration::from_millis);
+    let start = tokio::time::Instant::now();
+    let mut next_sweep = start + interval;
+    let mut next_prune = retention_every.map(|every| start + every);
 
     loop {
+        let wake = match next_prune {
+            Some(p) if p < next_sweep => p,
+            _ => next_sweep,
+        };
         tokio::select! {
-            _ = tokio::time::sleep(interval) => {}
+            _ = tokio::time::sleep_until(wake) => {}
             _ = shutdown.changed() => {
                 tracing::info!("Timeout processing loop shutting down");
                 return;
@@ -43,6 +57,17 @@ pub async fn run(
         let Ok(engine) = state.engine() else {
             return;
         };
+        let now_instant = tokio::time::Instant::now();
+        if let (Some(due), Some(every)) = (next_prune, retention_every) {
+            if now_instant >= due {
+                prune(engine.as_ref()).await;
+                next_prune = Some(tokio::time::Instant::now() + every);
+            }
+        }
+        if now_instant < next_sweep {
+            continue;
+        }
+        next_sweep = tokio::time::Instant::now() + interval;
         let now = util::system_time_ms();
         let span = tracing::info_span!(
             "resonate.timer.sweep",
@@ -76,5 +101,39 @@ pub async fn run(
         }
         .instrument(span)
         .await;
+    }
+}
+
+/// The most passes one wake-up runs back to back. Each is one transaction of
+/// at most `retention.batch` promises; a backlog drains this many batches per
+/// interval and then yields to the sweep.
+const MAX_PASSES_PER_WAKE: usize = 16;
+
+/// Retention passes until one comes back short of a full batch.
+async fn prune(engine: &dyn crate::engine::Engine) {
+    let Some(batch) = engine.retention().map(|r| r.batch) else {
+        return;
+    };
+    for _ in 0..MAX_PASSES_PER_WAKE {
+        let now = util::system_time_ms();
+        let span = tracing::info_span!(
+            "resonate.retention.pass",
+            resonate.pruned = tracing::field::Empty,
+            resonate.tombstones_expired = tracing::field::Empty,
+        );
+        match engine.prune(now).instrument(span.clone()).await {
+            Ok(report) => {
+                span.record("resonate.pruned", report.pruned);
+                span.record("resonate.tombstones_expired", report.expired);
+                crate::retention::record(&report);
+                if !report.full(batch) {
+                    return;
+                }
+            }
+            Err(e) => {
+                tracing::error!(error = %e, "Retention pass failed: storage error");
+                return;
+            }
+        }
     }
 }

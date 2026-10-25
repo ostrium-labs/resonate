@@ -7,7 +7,9 @@
 //! graph, and one registry.
 
 use lazy_static::lazy_static;
-use resonate_plugin::prometheus::{register_counter, register_counter_vec, Counter, CounterVec};
+use resonate_plugin::prometheus::{
+    register_counter, register_counter_vec, register_int_gauge, Counter, CounterVec, IntGauge,
+};
 
 lazy_static! {
     /// Messages a transition emitted, by kind. Counted here rather than in the
@@ -26,6 +28,29 @@ lazy_static! {
         "Total number of promises created by schedules"
     )
     .unwrap();
+
+    /// Settled promises retention pruned. Each one left a tombstone, so this
+    /// is also the number of tombstones written. No tenant or tag label: a
+    /// label per selector would be a label per namespace.
+    pub static ref RETENTION_PRUNED_TOTAL: Counter = register_counter!(
+        "resonate_retention_pruned_total",
+        "Settled promises pruned by retention, each leaving a tombstone"
+    )
+    .unwrap();
+
+    /// Tombstones dropped because their horizon passed.
+    pub static ref RETENTION_TOMBSTONES_EXPIRED_TOTAL: Counter = register_counter!(
+        "resonate_retention_tombstones_expired_total",
+        "Retention tombstones dropped after their horizon"
+    )
+    .unwrap();
+
+    /// Live tombstones, as last counted (at most once a minute).
+    pub static ref RETENTION_TOMBSTONES: IntGauge = register_int_gauge!(
+        "resonate_retention_tombstones",
+        "Retention tombstones held, as last counted"
+    )
+    .unwrap();
 }
 
 /// Touch every counter so it is present at zero rather than appearing on its
@@ -35,4 +60,7 @@ pub fn declare() {
     MESSAGES_TOTAL.with_label_values(&["execute"]);
     MESSAGES_TOTAL.with_label_values(&["unblock"]);
     SCHEDULE_PROMISES_TOTAL.get();
+    RETENTION_PRUNED_TOTAL.get();
+    RETENTION_TOMBSTONES_EXPIRED_TOTAL.get();
+    RETENTION_TOMBSTONES.get();
 }

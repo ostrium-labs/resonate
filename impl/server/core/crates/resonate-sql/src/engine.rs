@@ -227,4 +227,23 @@ pub trait Engine: Send + Sync {
     fn returns_messages(&self) -> bool {
         false
     }
+
+    /// One bounded retention pass at `now`: prune up to a batch of the
+    /// promises the configured policy selects, leaving a tombstone for each,
+    /// and drop up to a batch of tombstones past their horizon.
+    ///
+    /// The default does nothing, which is what an engine without retention
+    /// configured, or without retention at all, does. Idempotent and safe to
+    /// run concurrently with anything: a promise is pruned only in a
+    /// transaction that also writes its tombstone, and every request that
+    /// names a tombstoned id answers `expired` from inside its own
+    /// transaction.
+    async fn prune(&self, _now: i64) -> StorageResult<crate::retention::PruneReport> {
+        Ok(crate::retention::PruneReport::default())
+    }
+
+    /// The retention policy this engine was opened with, if any.
+    fn retention(&self) -> Option<&resonate_core::retention::Retention> {
+        None
+    }
 }

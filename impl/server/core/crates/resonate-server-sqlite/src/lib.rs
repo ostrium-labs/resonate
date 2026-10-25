@@ -45,7 +45,9 @@ use resonate_core::types::{
 use resonate_core::ui;
 use resonate_core::util;
 
+use resonate_core::retention::Retention;
 use resonate_sql::engine::{Engine, Input, Outgoing, Output, Scheduled, Timeout};
+use resonate_sql::retention::{self, CountGate, Dialect, PruneReport};
 use resonate_sql::StorageError;
 
 use resonate_core::types::{
@@ -99,7 +101,15 @@ pub struct SqliteEngine {
     task_retry_timeout: i64,
     preload_limit: u32,
     debug: bool,
+    /// The retention policy, when one is configured. Its schema exists
+    /// exactly when this is `Some`.
+    retention: Option<Arc<Retention>>,
+    /// When a pass last counted the live tombstones.
+    count_gate: CountGate,
 }
+
+/// Retention's tables and indexes, applied by [`SqliteEngine::with_retention`].
+const RETENTION_SCHEMA: &str = include_str!("../retention.sql");
 
 impl SqliteEngine {
     pub fn open(
@@ -116,7 +126,30 @@ impl SqliteEngine {
             task_retry_timeout,
             preload_limit,
             debug,
+            retention: None,
+            count_gate: CountGate::default(),
         })
+    }
+
+    /// Turn retention on (FW5): create its schema, and from then on prune on
+    /// [`Engine::prune`] and answer `expired` for every tombstoned id.
+    ///
+    /// `None` leaves the engine exactly as `open` made it. The policy is
+    /// validated here as well as at configuration, so a caller that builds an
+    /// engine by hand cannot hand it one that cannot mean what it says.
+    pub fn with_retention(mut self, retention: Option<Retention>) -> rusqlite::Result<Self> {
+        let Some(policy) = retention else {
+            return Ok(self);
+        };
+        policy.validate().map_err(|e| {
+            rusqlite::Error::InvalidParameterName(format!("retention: {e}"))
+        })?;
+        {
+            let conn = self.conn.lock().unwrap_or_else(|e| e.into_inner());
+            conn.execute_batch(RETENTION_SCHEMA)?;
+        }
+        self.retention = Some(Arc::new(policy));
+        Ok(self)
     }
 
     /// Run one transition, and hand back what it emitted along with its result.
@@ -139,6 +172,7 @@ impl SqliteEngine {
             let conn = Arc::clone(&self.conn);
             let task_retry_timeout = self.task_retry_timeout;
             let preload_limit = self.preload_limit;
+            let retention = self.retention.is_some();
             tokio::task::block_in_place(|| {
                 // Use unwrap_or_else to recover from poisoned mutex (a prior panic
                 // while holding the lock). The connection itself is still valid.
@@ -148,6 +182,7 @@ impl SqliteEngine {
                     conn: &tx,
                     task_retry_timeout,
                     preload_limit,
+                    retention,
                     emitted: RefCell::new(Vec::new()),
                     armed: RefCell::new(Vec::new()),
                 };
@@ -170,12 +205,39 @@ impl SqliteEngine {
     where
         F: FnMut(&SqliteDb) -> StorageResult<ResponseEnvelope> + Send + 'static,
     {
+        // Retention: the ids this request names are checked against the
+        // tombstones AFTER the operation ran, in its transaction, so that a hit
+        // rolls back whatever it wrote — a re-created promise included — and
+        // answers `expired` instead.
+        let subjects = match &self.retention {
+            Some(_) => resonate_core::retention::subject_ids(&req.kind, &req.data),
+            None => Vec::new(),
+        };
+        let mut f = f;
+        let f = move |db: &SqliteDb| {
+            let response = f(db)?;
+            if !subjects.is_empty() && response.head.status != 400 {
+                if let Some(id) = db.tombstoned(&subjects)? {
+                    return Err(StorageError::Expired(id));
+                }
+            }
+            Ok(response)
+        };
         match self.transact(f).await {
             Ok((response, messages, timeouts)) => Output {
                 response: Some(response),
                 messages,
                 timeouts,
             },
+            Err(StorageError::Expired(id)) => {
+                tracing::debug!(promise_id = %id, kind = %req.kind, "Request names a pruned id");
+                Output::response(ResponseEnvelope::error(
+                    req.kind.clone(),
+                    req.head.corr_id.clone(),
+                    resonate_core::retention::EXPIRED_STATUS,
+                    resonate_core::retention::EXPIRED_MESSAGE,
+                ))
+            }
             Err(StorageError::InvalidInput(msg)) => Output::response(ResponseEnvelope::error(
                 req.kind.clone(),
                 req.head.corr_id.clone(),
@@ -205,12 +267,14 @@ impl SqliteEngine {
             let conn = Arc::clone(&self.conn);
             let task_retry_timeout = self.task_retry_timeout;
             let preload_limit = self.preload_limit;
+            let retention = self.retention.is_some();
             tokio::task::block_in_place(|| {
                 let conn = conn.lock().unwrap_or_else(|e| e.into_inner());
                 let db = SqliteDb {
                     conn: &conn,
                     task_retry_timeout,
                     preload_limit,
+                    retention,
                     emitted: RefCell::new(Vec::new()),
                     armed: RefCell::new(Vec::new()),
                 };
@@ -2298,10 +2362,22 @@ impl SqliteEngine {
             }
         }
 
-        match self
+        let swept = self
             .transact(move |db| process_all_timeouts(db, time).map(|_| ()))
-            .await
-        {
+            .await;
+        // Under debug no sweep runs, so a tick is also when retention runs:
+        // passes until one comes back short, as the sweep loop does.
+        if swept.is_ok() {
+            if let Err(e) = self.prune_until_short(time).await {
+                return Output::response(ResponseEnvelope::error(
+                    req.kind.clone(),
+                    req.head.corr_id.clone(),
+                    500,
+                    &format!("Tick failed: {}", e),
+                ));
+            }
+        }
+        match swept {
             Ok(((), messages, timeouts)) => Output {
                 response: Some(ResponseEnvelope::new(
                     req.kind.clone(),
@@ -2326,6 +2402,8 @@ struct SqliteDb<'a> {
     conn: &'a rusqlite::Connection,
     task_retry_timeout: i64,
     preload_limit: u32,
+    /// Whether retention is on, and so whether its tables exist.
+    retention: bool,
     /// What this transition has emitted so far.
     ///
     /// `RefCell` because every operation takes `&SqliteDb` — an emission is a
@@ -3789,12 +3867,18 @@ impl<'a> SqliteDb<'a> {
             .as_ref()
             .map(|h| serde_json::to_string(h).unwrap());
         let tags_json = serde_json::to_string(promise_tags).unwrap();
-        self.conn.execute(
-            "INSERT OR IGNORE INTO promises (id, state, param_headers, param_data, tags, timeout_at, created_at, settled_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
-            params![promise_id, state, ph, schedule.promise_param.data, tags_json, promise_timeout_at, created_at, settled_at],
-        )?;
-        let promise_inserted = self.conn.changes() > 0;
+        // An occurrence whose promise retention pruned is not created again:
+        // it already ran. The schedule still advances below.
+        let promise_inserted = if self.tombstoned(std::slice::from_ref(&promise_id))?.is_some() {
+            false
+        } else {
+            self.conn.execute(
+                "INSERT OR IGNORE INTO promises (id, state, param_headers, param_data, tags, timeout_at, created_at, settled_at)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+                params![promise_id, state, ph, schedule.promise_param.data, tags_json, promise_timeout_at, created_at, settled_at],
+            )?;
+            self.conn.changes() > 0
+        };
 
         if promise_inserted {
             // The INSERT above put the row on the queue if it is pending and
@@ -3852,7 +3936,103 @@ impl<'a> SqliteDb<'a> {
             "DELETE FROM listeners; DELETE FROM callbacks;
              DELETE FROM promises; DELETE FROM schedules;",
         )?;
+        if self.retention {
+            self.conn.execute_batch("DELETE FROM promise_tombstones;")?;
+        }
         Ok(())
+    }
+
+    /// The first of `ids` that holds a tombstone, if any.
+    ///
+    /// A tombstone past its horizon still answers until a pass drops it:
+    /// the reservation lasts at least the horizon, never less.
+    fn tombstoned(&self, ids: &[String]) -> StorageResult<Option<String>> {
+        if !self.retention {
+            return Ok(None);
+        }
+        let mut stmt = self
+            .conn
+            .prepare_cached("SELECT 1 FROM promise_tombstones WHERE id = ?1")?;
+        for id in ids {
+            if stmt.exists(params![id])? {
+                return Ok(Some(id.clone()));
+            }
+        }
+        Ok(None)
+    }
+
+    /// One retention pass at `now`. See `resonate_sql::retention`.
+    fn prune(&self, policy: &Retention, now: i64, count: bool) -> StorageResult<PruneReport> {
+        let cutoff = retention::max_cutoff(policy, now);
+        let batch = policy.batch;
+        let settled = format!(
+            "SELECT id FROM promises p
+             WHERE p.state <> 'pending' AND p.settled_at <= {cutoff}
+               AND (p.task_state IS NULL OR p.task_state = 'fulfilled')
+               AND {selects}
+               AND NOT EXISTS (SELECT 1 FROM callbacks c WHERE c.awaited_id = p.id)
+               AND NOT EXISTS (SELECT 1 FROM listeners l WHERE l.promise_id = p.id)
+             ORDER BY p.settled_at LIMIT {batch}",
+            selects = retention::selection(Dialect::Sqlite, policy, now, "p.settled_at"),
+        );
+        let mut ids: Vec<String> = {
+            let mut stmt = self.conn.prepare(&settled)?;
+            let rows = stmt.query_map([], |r| r.get::<_, String>(0))?;
+            rows.collect::<rusqlite::Result<_>>()?
+        };
+        if ids.len() < batch {
+            // Internal promises past their deadline: nothing can wait on one,
+            // so it has no task, listener or callback to check.
+            let lapsed = format!(
+                "SELECT id FROM promises
+                 WHERE state = 'pending' AND NOT external AND timeout_at <= {cutoff}
+                   AND {selects}
+                 ORDER BY timeout_at LIMIT {left}",
+                selects = retention::selection(Dialect::Sqlite, policy, now, "timeout_at"),
+                left = batch - ids.len(),
+            );
+            let mut stmt = self.conn.prepare(&lapsed)?;
+            let rows = stmt.query_map([], |r| r.get::<_, String>(0))?;
+            for id in rows {
+                ids.push(id?);
+            }
+        }
+        let expires_at = now.saturating_add(policy.horizon());
+        for id in &ids {
+            self.conn.execute(
+                "INSERT INTO promise_tombstones (id, pruned_at, expires_at) VALUES (?1, ?2, ?3)
+                 ON CONFLICT (id) DO UPDATE SET pruned_at = excluded.pruned_at, expires_at = excluded.expires_at",
+                params![id, now, expires_at],
+            )?;
+            // The awaited side is empty (the candidate query checked); what
+            // is left is this promise as someone else's awaiter, which is
+            // settled and has nothing to resume.
+            self.conn
+                .execute("DELETE FROM callbacks WHERE awaiter_id = ?1", params![id])?;
+            self.conn
+                .execute("DELETE FROM listeners WHERE promise_id = ?1", params![id])?;
+            self.conn
+                .execute("DELETE FROM promises WHERE id = ?1", params![id])?;
+        }
+        let expired = self.conn.execute(
+            "DELETE FROM promise_tombstones WHERE id IN (
+               SELECT id FROM promise_tombstones WHERE expires_at <= ?1 ORDER BY expires_at LIMIT ?2)",
+            params![now, batch as i64],
+        )?;
+        let live = if count {
+            Some(self.conn.query_row(
+                "SELECT COUNT(*) FROM promise_tombstones",
+                [],
+                |r| r.get::<_, i64>(0),
+            )? as u64)
+        } else {
+            None
+        };
+        Ok(PruneReport {
+            pruned: ids.len() as u64,
+            expired: expired as u64,
+            live,
+        })
     }
 
     /// Fire expired timeouts, either all of them or one named.
@@ -4293,9 +4473,39 @@ impl Engine for SqliteEngine {
     fn returns_messages(&self) -> bool {
         true
     }
+
+    async fn prune(&self, now: i64) -> StorageResult<PruneReport> {
+        let Some(policy) = self.retention.clone() else {
+            return Ok(PruneReport::default());
+        };
+        let count = self.count_gate.due(now);
+        self.transact(move |db| db.prune(&policy, now, count))
+            .await
+            .map(|(report, _, _)| report)
+    }
+
+    fn retention(&self) -> Option<&Retention> {
+        self.retention.as_deref()
+    }
 }
 
 impl SqliteEngine {
+    /// Retention passes at `now` until one comes back short of a full batch,
+    /// recording each. What `debug.tick` runs, since under debug there is no
+    /// sweep loop to run them.
+    async fn prune_until_short(&self, now: i64) -> StorageResult<()> {
+        let Some(batch) = self.retention.as_ref().map(|r| r.batch) else {
+            return Ok(());
+        };
+        loop {
+            let report = Engine::prune(self, now).await?;
+            retention::record(&report);
+            if !report.full(batch) {
+                return Ok(());
+            }
+        }
+    }
+
     /// Fire one timeout the system asked of itself.
     ///
     /// Per-timeout rather than a sweep: each variant runs only the statement
@@ -4385,6 +4595,11 @@ pub struct Config {
     /// this runs.
     #[serde(default = "default_sweep_interval")]
     pub sweep_interval: u64,
+
+    /// Settled-promise retention (`[servers.server_sqlite.retention]`). Off
+    /// when absent. See `docs/protocol-profile.md`, "Retention".
+    #[serde(default)]
+    pub retention: Option<Retention>,
 }
 
 fn default_preload_limit() -> u32 {
@@ -4417,6 +4632,7 @@ impl Default for Config {
             wheel_capacity: default_wheel_capacity(),
             wheel_refresh: default_wheel_refresh(),
             sweep_interval: default_sweep_interval(),
+            retention: None,
         }
     }
 }
@@ -4428,6 +4644,10 @@ fn configure(
     deps: ServerDependencies,
 ) -> Result<std::sync::Arc<dyn ResonateServer>, ConfigError> {
     let config: Config = settings.extract()?;
+    if let Some(r) = &config.retention {
+        r.validate()
+            .map_err(|e| settings.reject("retention", &e))?;
+    }
 
     let options = resonate_sql::server::Options {
         server_url: config.server_url.clone(),
@@ -4446,6 +4666,7 @@ fn configure(
                     open.migrate,
                     debug,
                 )
+                .and_then(|engine| engine.with_retention(open.retention.clone()))
                 .map_err(|e| {
                     resonate_plugin::Unavailable::new(format!("cannot open {}: {e}", open.path))
                 })?;
