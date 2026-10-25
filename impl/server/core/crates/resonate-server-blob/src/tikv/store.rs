@@ -223,6 +223,13 @@ fn classify(e: &TikvError) -> Class {
                 || !ke.retryable.is_empty()
             {
                 Class::Conflict
+            } else if ke.abort.contains("KeyTooLarge")
+                || ke.abort.contains("EntryTooLarge")
+                || ke.abort.contains("TxnTooLarge")
+            {
+                // TiKV's size limits (8 KiB keys by default): no retry can
+                // make the write fit.
+                Class::Fatal
             } else if !ke.abort.is_empty()
                 || ke.commit_ts_expired.is_some()
                 || ke.txn_not_found.is_some()
