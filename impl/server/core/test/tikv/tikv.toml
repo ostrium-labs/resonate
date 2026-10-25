@@ -7,3 +7,11 @@ enable-ttl = true
 
 [storage.block-cache]
 capacity = "512MB"
+
+# TiKV refuses to start when the open-file limit is below what its RocksDB
+# instances may open (default 40960 each). CI runners allow 65536; ask for less.
+[rocksdb]
+max-open-files = 16384
+
+[raftdb]
+max-open-files = 16384
