@@ -16,6 +16,18 @@ use tracing::Instrument;
 use crate::deadlines::DeadlineTimer;
 use crate::metrics;
 
+/// How many due deadlines [`Server::fire`] works on at once.
+///
+/// Measured with `cargo xtask bench` (16 clients, 500 timers due together;
+/// see docs/bench.md). On Postgres, firing one at a time left the timer p99
+/// at 14 s, because each `Internal` is a transaction with a round trip and
+/// 500 of them back to back take seconds. 8 at once brought it to 1.6 s and
+/// 16 to 0.6 s, with request throughput unchanged. On SQLite the difference
+/// was inside the run-to-run noise. A fire waits for a pool connection like
+/// any request, so a bound above the pool size (Postgres and MySQL default to
+/// 10) queues fires rather than taking connections from requests.
+pub const FIRE_CONCURRENCY: usize = 16;
+
 /// What every server in this family is: an engine, a router to deliver through,
 /// a timer for the near future, and a sweep behind both.
 ///
@@ -172,28 +184,47 @@ impl Server {
     /// to the router, and a deadline a firing armed goes straight back into the
     /// timer, which is how a redispatched task keeps its retry deadline live
     /// without a round trip through the sweep.
+    ///
+    /// Up to [`FIRE_CONCURRENCY`] at a time. Under load most of what fires is
+    /// a no-op (the retry deadline of a task acquired since, the lease of one
+    /// fulfilled since), each one still a transaction, and the timer looks at
+    /// its wheel again only when the whole batch is done. They are independent
+    /// rows and each `Internal` re-reads its own, so their order is not
+    /// load-bearing: it is the same overlap the sweep already has with the
+    /// timer.
     pub async fn fire(&self, timeouts: Vec<Timeout>) {
+        let Some(this) = self.this.upgrade() else {
+            return;
+        };
+        let Ok(engine) = this.engine() else {
+            return;
+        };
+        let engine = Arc::clone(engine);
         let now = util::system_time_ms();
         let span = tracing::info_span!("resonate.timer.fire", resonate.timeouts = timeouts.len());
         async {
+            let mut firing = tokio::task::JoinSet::new();
             for timeout in timeouts {
-                let Ok(engine) = self.engine() else {
-                    return;
-                };
+                if firing.len() >= FIRE_CONCURRENCY {
+                    firing.join_next().await;
+                }
                 let one = tracing::info_span!(
                     "resonate.timer.timeout",
                     otel.name = %format_args!("timeout {}", timeout.kind()),
                     resonate.timeout.kind = timeout.kind(),
                     resonate.timeout.id = %timeout.id(),
                 );
-                async {
-                    let out = engine.process(Input::Internal(timeout), now).await;
-                    self.deliver(out.messages).await;
-                    self.arm(out.timeouts);
-                }
-                .instrument(one)
-                .await;
+                let (server, engine) = (Arc::clone(&this), Arc::clone(&engine));
+                firing.spawn(
+                    async move {
+                        let out = engine.process(Input::Internal(timeout), now).await;
+                        server.deliver(out.messages).await;
+                        server.arm(out.timeouts);
+                    }
+                    .instrument(one),
+                );
             }
+            while firing.join_next().await.is_some() {}
         }
         .instrument(span)
         .await
