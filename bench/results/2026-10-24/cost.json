@@ -1,0 +1,180 @@
+{
+  "starter": {
+    "fanout": {
+      "ru_per_wf": 737.4390277531664,
+      "free_workflows_per_month": 67802.21566566703,
+      "usd_per_1m_workflows_compute": {
+        "aws-us-west-2": 73.74390277531664,
+        "aws-us-east-1": 73.74390277531664,
+        "aws-ap-southeast-1": 88.49268333037998,
+        "aws-ap-northeast-1": 88.49268333037998,
+        "aws-eu-central-1": 88.49268333037998,
+        "aws-sa-east-1": 117.99024444050663,
+        "alicloud-ap-southeast-1": 88.49268333037998
+      },
+      "usd_per_1m_workflows_storage_month": {
+        "aws-us-west-2": 0.678766518831253,
+        "aws-us-east-1": 0.678766518831253,
+        "aws-ap-southeast-1": 0.8145198225975037,
+        "aws-ap-northeast-1": 0.8145198225975037,
+        "aws-eu-central-1": 0.8145198225975037,
+        "aws-sa-east-1": 1.2896563857793808,
+        "alicloud-ap-southeast-1": 0.8145198225975037
+      },
+      "retained_workflows_in_free_storage": 1473260.6459756868
+    },
+    "chain": {
+      "ru_per_wf": 1563.6980673444461,
+      "free_workflows_per_month": 31975.482379992074,
+      "usd_per_1m_workflows_compute": {
+        "aws-us-west-2": 156.36980673444464,
+        "aws-us-east-1": 156.36980673444464,
+        "aws-ap-southeast-1": 187.64376808133352,
+        "aws-ap-northeast-1": 187.64376808133352,
+        "aws-eu-central-1": 187.64376808133352,
+        "aws-sa-east-1": 250.1916907751114,
+        "alicloud-ap-southeast-1": 187.64376808133352
+      },
+      "usd_per_1m_workflows_storage_month": {
+        "aws-us-west-2": 0.8110888302326202,
+        "aws-us-east-1": 0.8110888302326202,
+        "aws-ap-southeast-1": 0.9733065962791443,
+        "aws-ap-northeast-1": 0.9733065962791443,
+        "aws-eu-central-1": 0.9733065962791443,
+        "aws-sa-east-1": 1.5410687774419785,
+        "alicloud-ap-southeast-1": 0.9733065962791443
+      },
+      "retained_workflows_in_free_storage": 1232910.579859915
+    },
+    "burst": {
+      "ru_per_wf": 150.48567341249387,
+      "free_workflows_per_month": 332257.5423040159,
+      "usd_per_1m_workflows_compute": {
+        "aws-us-west-2": 15.048567341249388,
+        "aws-us-east-1": 15.048567341249388,
+        "aws-ap-southeast-1": 18.058280809499262,
+        "aws-ap-northeast-1": 18.058280809499262,
+        "aws-eu-central-1": 18.058280809499262,
+        "aws-sa-east-1": 24.07770774599902,
+        "alicloud-ap-southeast-1": 18.058280809499262
+      },
+      "usd_per_1m_workflows_storage_month": {
+        "aws-us-west-2": 0.15545636415481567,
+        "aws-us-east-1": 0.15545636415481567,
+        "aws-ap-southeast-1": 0.1865476369857788,
+        "aws-ap-northeast-1": 0.1865476369857788,
+        "aws-eu-central-1": 0.1865476369857788,
+        "aws-sa-east-1": 0.2953670918941498,
+        "alicloud-ap-southeast-1": 0.1865476369857788
+      },
+      "retained_workflows_in_free_storage": 6432673.280613467
+    }
+  },
+  "tikv_monthly_usd": {
+    "aws (us-east-1, t3.large + 50 GB gp3)": 194.20799999999997,
+    "gcp (us-central1, e2-standard-2 + 50 GB pd-balanced)": 161.7550098,
+    "azure (East US, D2s v5 + E6 64 GiB)": 224.64,
+    "single VM, aws t3.large + 50 GB gp3 (no replication, not HA)": 64.73599999999999
+  },
+  "breakeven": {
+    "fanout": {
+      "aws (us-east-1, t3.large + 50 GB gp3)": {
+        "aws-us-east-1": 2701348.755665239,
+        "aws-ap-southeast-1": 2262424.332331977
+      },
+      "gcp (us-central1, e2-standard-2 + 50 GB pd-balanced)": {
+        "aws-us-east-1": 2261271.8275580034,
+        "aws-ap-southeast-1": 1895693.558909281
+      },
+      "azure (East US, D2s v5 + E6 64 GiB)": {
+        "aws-us-east-1": 3114020.1610927545,
+        "aws-ap-southeast-1": 2606317.1701882402
+      },
+      "single VM, aws t3.large + 50 GB gp3 (no replication, not HA)": {
+        "aws-us-east-1": 945651.0623321909,
+        "aws-ap-southeast-1": 799342.9212211038
+      }
+    },
+    "chain": {
+      "aws (us-east-1, t3.large + 50 GB gp3)": {
+        "aws-us-east-1": 1273954.3787906922,
+        "aws-ap-southeast-1": 1066957.8960555755
+      },
+      "gcp (us-central1, e2-standard-2 + 50 GB pd-balanced)": {
+        "aws-us-east-1": 1066414.3755270613,
+        "aws-ap-southeast-1": 894007.893335883
+      },
+      "azure (East US, D2s v5 + E6 64 GiB)": {
+        "aws-us-east-1": 1468569.9547482757,
+        "aws-ap-southeast-1": 1229137.5426868955
+      },
+      "single VM, aws t3.large + 50 GB gp3 (no replication, not HA)": {
+        "aws-us-east-1": 445968.4478502254,
+        "aws-ap-southeast-1": 376969.62027185323
+      }
+    },
+    "burst": {
+      "aws (us-east-1, t3.large + 50 GB gp3)": {
+        "aws-us-east-1": 13237672.097459678,
+        "aws-ap-southeast-1": 11086769.671600401
+      },
+      "gcp (us-central1, e2-standard-2 + 50 GB pd-balanced)": {
+        "aws-us-east-1": 11081121.944606017,
+        "aws-ap-southeast-1": 9289644.54422235
+      },
+      "azure (East US, D2s v5 + E6 64 GiB)": {
+        "aws-us-east-1": 15259924.402938839,
+        "aws-ap-southeast-1": 12771979.92616637
+      },
+      "single VM, aws t3.large + 50 GB gp3 (no replication, not HA)": {
+        "aws-us-east-1": 4634062.39402257,
+        "aws-ap-southeast-1": 3917094.9187361444
+      }
+    }
+  },
+  "inputs": {
+    "starter_scaling": {
+      "read": 1.5,
+      "write": 2.26,
+      "why": "per-statement RU from @@tidb_last_query_info, 20 of each, local TiDB v8.5.8 vs Starter aws-us-west-2 (2026-10-25): INSERT 2.90 vs 6.73, autocommit UPDATE 3.28 vs 7.23, SELECT FOR UPDATE 1.70 vs 2.55, point get 0.52 vs 0.50; bench-data ru-spot-*.txt"
+    },
+    "method": "Resonate server (MySQL plugin) on a local TiDB v8.5.8 (ghcr.io/ostrium-labs/tidb:v8.5.8-loams.1, keyspace mode) over one PD + one TiKV v8.5.8; RU = sum over statements_summary(+history) of EXEC_COUNT*(AVG_REQUEST_UNIT_READ+AVG_REQUEST_UNIT_WRITE) for schema resonate, before/after each workload; bytes = sum(DATA_LENGTH+INDEX_LENGTH) after ANALYZE, delta per workload divided by its workflows",
+    "workloads": {
+      "fanout": {
+        "workflows": 100,
+        "ru_read_per_wf_local": 137.61003704378314,
+        "ru_write_per_wf_local": 234.96635937499636,
+        "ru_per_wf_local": 372.5763964187795,
+        "ru_per_wf": 737.4390277531664,
+        "bytes_total_after": 364410,
+        "bytes_per_wf": 3644.1
+      },
+      "chain": {
+        "workflows": 20,
+        "ru_read_per_wf_local": 234.19315166715586,
+        "ru_write_per_wf_local": 536.4638671874834,
+        "ru_per_wf_local": 770.6570188546393,
+        "ru_per_wf": 1563.6980673444461,
+        "bytes_total_after": 451500,
+        "bytes_per_wf": 4354.5
+      },
+      "burst": {
+        "workflows": 100,
+        "ru_read_per_wf_local": 23.616498420833196,
+        "ru_write_per_wf_local": 50.91191406249738,
+        "ru_per_wf_local": 74.52841248333058,
+        "ru_per_wf": 150.48567341249387,
+        "bytes_total_after": 534960,
+        "bytes_per_wf": 834.6
+      }
+    }
+  },
+  "tikv_capacity": {
+    "max_request_rate_per_s": 2177.7381727215875,
+    "requests_per_workflow": {
+      "chain": 26.98,
+      "burst": 4.0,
+      "fanout": 18.0
+    }
+  }
+}

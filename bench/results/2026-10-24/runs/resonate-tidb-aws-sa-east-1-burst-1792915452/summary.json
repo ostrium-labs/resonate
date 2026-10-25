@@ -1,0 +1,93 @@
+{
+  "run_id": "resonate-tidb-aws-sa-east-1-burst-1792915452",
+  "system": "resonate",
+  "backend": "tidb-aws-sa-east-1",
+  "workload": "burst",
+  "params": {
+    "concurrency": 50,
+    "n": 50,
+    "wake": "push"
+  },
+  "started": 50,
+  "completed": 50,
+  "failed": 0,
+  "retries": 0,
+  "wall_s": 57.181712354,
+  "throughput_wf_s": 0.8744054338642481,
+  "latency": {
+    "n": 50,
+    "mean_ms": 49445.49088404,
+    "p50_ms": 47928.734665,
+    "p95_ms": 56706.393095,
+    "p99_ms": 57181.286518,
+    "max_ms": 57181.286518
+  },
+  "steps": {
+    "activity": {
+      "n": 50,
+      "mean_ms": 22491.43954898,
+      "p50_ms": 23172.111525,
+      "p95_ms": 26602.805974,
+      "p99_ms": 28678.833576,
+      "max_ms": 28678.833576
+    }
+  },
+  "sleep_lateness": null,
+  "requests": {
+    "task.create": {
+      "n": 50,
+      "mean_ms": 8554.08163006,
+      "p50_ms": 6893.246668,
+      "p95_ms": 12246.229127,
+      "p99_ms": 12837.281425,
+      "max_ms": 12837.281425
+    },
+    "task.fence(promise.create)": {
+      "n": 50,
+      "mean_ms": 8740.064411059999,
+      "p50_ms": 10125.821419,
+      "p95_ms": 11072.293191,
+      "p99_ms": 11525.883968,
+      "max_ms": 11525.883968
+    },
+    "task.fence(promise.settle)": {
+      "n": 50,
+      "mean_ms": 13751.24903266,
+      "p50_ms": 13814.404641,
+      "p95_ms": 16791.089313,
+      "p99_ms": 17152.833008,
+      "max_ms": 17152.833008
+    },
+    "task.fulfill": {
+      "n": 50,
+      "mean_ms": 18399.79825746,
+      "p50_ms": 19085.343989,
+      "p95_ms": 21469.501582,
+      "p99_ms": 22462.869242,
+      "max_ms": 22462.869242
+    },
+    "task.heartbeat": {
+      "n": 42,
+      "mean_ms": 13769.135863261905,
+      "p50_ms": 13663.361047,
+      "p95_ms": 16430.593999,
+      "p99_ms": 16838.32212,
+      "max_ms": 16838.32212
+    }
+  },
+  "request_errors": 0,
+  "errors": {},
+  "resources": [
+    {
+      "target": "pid:450506",
+      "cpu_avg_pct": 0.8134646544416637,
+      "cpu_max_pct": 1.9998305063652637,
+      "rss_avg_mb": 23.799655720338983,
+      "rss_max_mb": 26.09375,
+      "samples": 59
+    }
+  ],
+  "notes": [
+    "server on this laptop; store TiDB Cloud Starter aws-sa-east-1 over WAN (TLS); pool 32"
+  ]
+}

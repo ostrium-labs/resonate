@@ -1,0 +1,10 @@
+# Put the Temporal stack's Postgres data on $RBENCH_DATA, the disk every local
+# leg uses (the bench's runs use this override):
+#   RBENCH_DATA=/mnt/Projects/rbench-data podman compose -f compose.yaml -f compose.data.yaml -f compose.otel.yaml up -d
+volumes:
+  pgdata:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${RBENCH_DATA:?set RBENCH_DATA}/temporal-pg

@@ -1,0 +1,141 @@
+# rbench: Apache Airflow 3.3.2 with the Edge executor (edge3 4.3.2) on Postgres 17.
+# Laptop shape of DX0's airflow profile (loams deploy/release/compose.compute.yaml):
+# one scheduler (DX0 runs two), api-server, dag-processor, triggerer, two edge workers.
+#
+#   podman build -t localhost/rbench-airflow:3.3.2-edge3-4.3.2 -f Containerfile .
+#   podman compose -p rbench-airflow up -d
+#   podman compose -p rbench-airflow down -v
+#
+# Every knob below is explained in README.md. Host ports bind 127.0.0.1 only.
+name: rbench-airflow
+
+x-airflow: &airflow
+  image: localhost/rbench-airflow:3.3.2-edge3-4.3.2
+  restart: unless-stopped
+  environment: &airflow-env
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres:5432/airflow
+    AIRFLOW__CORE__EXECUTOR: airflow.providers.edge3.executors.EdgeExecutor
+    AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+    AIRFLOW__CORE__FERNET_KEY: ""
+    AIRFLOW__CORE__EXECUTION_API_SERVER_URL: http://airflow-api-server:8080/execution/
+    AIRFLOW__API__BASE_URL: http://airflow-api-server:8080
+    AIRFLOW__API__WORKERS: "4"
+    AIRFLOW__API_AUTH__JWT_SECRET: rbench-test-only-jwt-secret-not-for-production
+    # Simple auth manager, one fixed admin (password file written at api-server start).
+    AIRFLOW__CORE__AUTH_MANAGER: airflow.api_fastapi.auth.managers.simple.simple_auth_manager.SimpleAuthManager
+    AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_USERS: admin:admin
+    AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_PASSWORDS_FILE: /opt/airflow/simple_auth_manager_passwords.json
+    # Benchmark tuning (README.md "Knobs").
+    AIRFLOW__CORE__PARALLELISM: "256"
+    AIRFLOW__CORE__MAX_ACTIVE_TASKS_PER_DAG: "1024"
+    AIRFLOW__CORE__MAX_ACTIVE_RUNS_PER_DAG: "256"
+    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "false"
+    AIRFLOW__CORE__DEFAULT_POOL_TASK_SLOT_COUNT: "1024"
+    AIRFLOW__SCHEDULER__SCHEDULER_HEARTBEAT_SEC: "1"
+    AIRFLOW__SCHEDULER__MAX_TIS_PER_QUERY: "512"
+    AIRFLOW__SCHEDULER__MAX_DAGRUNS_PER_LOOP_TO_SCHEDULE: "256"
+    AIRFLOW__WORKERS__EXECUTION_API_TIMEOUT: "30"
+    AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: "true"
+    AIRFLOW__DAG_PROCESSOR__REFRESH_INTERVAL: "5"
+    AIRFLOW__DAG_PROCESSOR__MIN_FILE_PROCESS_INTERVAL: "30"
+    AIRFLOW__EDGE__API_ENABLED: "true"
+    AIRFLOW__EDGE__API_URL: http://airflow-api-server:8080/edge_worker/v1/rpcapi
+    AIRFLOW__EDGE__JOB_POLL_INTERVAL: "1"
+    AIRFLOW__EDGE__HEARTBEAT_INTERVAL: "10"
+    AIRFLOW__EDGE__WORKER_CONCURRENCY: "16"
+    AIRFLOW__EDGE__PUSH_LOGS: "false"
+    AIRFLOW__TRIGGERER__CAPACITY: "1000"
+    # OpenTelemetry traces -> host collector, OTLP over HTTP/protobuf. On 3.3.2,
+    # [traces] otel_on switches tracing on and the exporter comes from the standard
+    # OTEL_* env (the default `otlp` exporter is gRPC; otel_host/otel_port are the
+    # deprecated back-compat path). See README.md "OpenTelemetry".
+    AIRFLOW__TRACES__OTEL_ON: "true"
+    OTEL_TRACES_EXPORTER: otlp_proto_http
+    OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: http://host.containers.internal:4318/v1/traces
+    OTEL_SERVICE_NAME: rbench-airflow
+  volumes:
+    - ./dags:/opt/airflow/dags:ro,z
+  depends_on:
+    airflow-init:
+      condition: service_completed_successfully
+
+services:
+  postgres:
+    image: docker.io/library/postgres:17.10@sha256:7958605b474b3d264a969cb3a123d6aa00ad1e1fe9da8a69984dabb704d93317
+    container_name: rbench-airflow-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    command: ["postgres", "-c", "max_connections=400"]
+    ports:
+      - "127.0.0.1:15434:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U airflow -d airflow"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    mem_limit: 1g
+
+  airflow-init:
+    <<: *airflow
+    container_name: rbench-airflow-init
+    restart: "no"
+    command: ["db", "migrate"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    mem_limit: 1g
+
+  airflow-api-server:
+    <<: *airflow
+    container_name: rbench-airflow-api-server
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        echo '{"admin": "admin"}' > /opt/airflow/simple_auth_manager_passwords.json
+        exec /entrypoint api-server
+    ports:
+      - "127.0.0.1:18080:8080"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/api/v2/monitor/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 60
+    mem_limit: 2g
+
+  airflow-scheduler:
+    <<: *airflow
+    container_name: rbench-airflow-scheduler
+    command: ["scheduler"]
+    mem_limit: 1g
+
+  airflow-dag-processor:
+    <<: *airflow
+    container_name: rbench-airflow-dag-processor
+    command: ["dag-processor"]
+    mem_limit: 1g
+
+  airflow-triggerer:
+    <<: *airflow
+    container_name: rbench-airflow-triggerer
+    command: ["triggerer"]
+    mem_limit: 1g
+
+  airflow-edge-worker-1:
+    <<: *airflow
+    container_name: rbench-airflow-edge-worker-1
+    command: ["edge", "worker", "--edge-hostname", "edge-worker-1", "--queues", "default", "--concurrency", "16"]
+    mem_limit: 3g
+
+  airflow-edge-worker-2:
+    <<: *airflow
+    container_name: rbench-airflow-edge-worker-2
+    command: ["edge", "worker", "--edge-hostname", "edge-worker-2", "--queues", "default", "--concurrency", "16"]
+    mem_limit: 3g
+
+volumes:
+  pgdata:

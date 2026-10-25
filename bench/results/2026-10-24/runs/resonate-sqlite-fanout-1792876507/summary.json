@@ -1,0 +1,94 @@
+{
+  "run_id": "resonate-sqlite-fanout-1792876507",
+  "system": "resonate",
+  "backend": "sqlite",
+  "workload": "fanout",
+  "params": {
+    "concurrency": 20,
+    "k": 8,
+    "n": 500,
+    "wake": "push"
+  },
+  "started": 500,
+  "completed": 500,
+  "failed": 0,
+  "retries": 0,
+  "wall_s": 10.205706115,
+  "throughput_wf_s": 48.9922004774483,
+  "latency": {
+    "n": 500,
+    "mean_ms": 391.23505037,
+    "p50_ms": 279.643068,
+    "p95_ms": 1128.104869,
+    "p99_ms": 1842.691392,
+    "max_ms": 2221.88896
+  },
+  "steps": {
+    "activity": {
+      "n": 4000,
+      "mean_ms": 168.28506003525,
+      "p50_ms": 119.238378,
+      "p95_ms": 382.044829,
+      "p99_ms": 1554.451044,
+      "max_ms": 1689.490351
+    }
+  },
+  "sleep_lateness": null,
+  "requests": {
+    "task.create": {
+      "n": 500,
+      "mean_ms": 81.751430348,
+      "p50_ms": 52.403558,
+      "p95_ms": 211.854606,
+      "p99_ms": 881.729771,
+      "max_ms": 1529.73423
+    },
+    "task.fence(promise.create)": {
+      "n": 4000,
+      "mean_ms": 89.4856833475,
+      "p50_ms": 58.690207,
+      "p95_ms": 212.157195,
+      "p99_ms": 733.831398,
+      "max_ms": 1562.398925
+    },
+    "task.fence(promise.settle)": {
+      "n": 4000,
+      "mean_ms": 78.697030158,
+      "p50_ms": 58.29673,
+      "p95_ms": 186.240175,
+      "p99_ms": 634.582454,
+      "max_ms": 1652.549154
+    },
+    "task.fulfill": {
+      "n": 500,
+      "mean_ms": 84.146730982,
+      "p50_ms": 54.294811,
+      "p95_ms": 197.702935,
+      "p99_ms": 803.499862,
+      "max_ms": 1559.875294
+    }
+  },
+  "request_errors": 0,
+  "errors": {},
+  "resources": [
+    {
+      "target": "pid:3718146",
+      "cpu_avg_pct": 78.10370522955678,
+      "cpu_max_pct": 141.03120041291473,
+      "rss_avg_mb": 50.05390625,
+      "rss_max_mb": 54.1171875,
+      "samples": 10
+    },
+    {
+      "target": "proc:rbench",
+      "cpu_avg_pct": 26.04413604339078,
+      "cpu_max_pct": 67.64372018755355,
+      "rss_avg_mb": 46.05390625,
+      "rss_max_mb": 52.63671875,
+      "samples": 10
+    }
+  ],
+  "notes": [
+    "SQLite file on ext4 (/mnt/Projects)"
+  ]
+}

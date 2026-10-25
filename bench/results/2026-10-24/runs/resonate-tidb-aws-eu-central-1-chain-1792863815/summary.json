@@ -1,0 +1,126 @@
+{
+  "run_id": "resonate-tidb-aws-eu-central-1-chain-1792863815",
+  "system": "resonate",
+  "backend": "tidb-aws-eu-central-1",
+  "workload": "chain",
+  "params": {
+    "concurrency": 10,
+    "l": 5,
+    "n": 20,
+    "sleep_ms": 1000,
+    "wake": "push"
+  },
+  "started": 20,
+  "completed": 20,
+  "failed": 0,
+  "retries": 0,
+  "wall_s": 280.224844437,
+  "throughput_wf_s": 0.07137125917647316,
+  "latency": {
+    "n": 20,
+    "mean_ms": 137021.0603822,
+    "p50_ms": 135909.514024,
+    "p95_ms": 151885.193015,
+    "p99_ms": 153340.600503,
+    "max_ms": 153340.600503
+  },
+  "steps": {
+    "activity": {
+      "n": 100,
+      "mean_ms": 12251.40983997,
+      "p50_ms": 10844.784145,
+      "p95_ms": 20226.875092,
+      "p99_ms": 20960.242096,
+      "max_ms": 21153.004173
+    },
+    "sleep": {
+      "n": 100,
+      "mean_ms": 13008.357555879998,
+      "p50_ms": 12111.68444,
+      "p95_ms": 17620.293354,
+      "p99_ms": 20896.243901,
+      "max_ms": 21899.816645
+    }
+  },
+  "sleep_lateness": {
+    "n": 100,
+    "mean_ms": 12008.84304682,
+    "p50_ms": 11111.728182,
+    "p95_ms": 16620.842779,
+    "p99_ms": 19896.808987,
+    "max_ms": 20900.704545
+  },
+  "requests": {
+    "task.create": {
+      "n": 20,
+      "mean_ms": 4669.42778125,
+      "p50_ms": 4533.837206,
+      "p95_ms": 5738.803445,
+      "p99_ms": 6310.950689,
+      "max_ms": 6310.950689
+    },
+    "task.fence(promise.create)": {
+      "n": 100,
+      "mean_ms": 4877.02961683,
+      "p50_ms": 4095.226867,
+      "p95_ms": 10598.886825,
+      "p99_ms": 12870.236466,
+      "max_ms": 14279.109053
+    },
+    "task.fence(promise.settle)": {
+      "n": 100,
+      "mean_ms": 7374.24439542,
+      "p50_ms": 6721.996785,
+      "p95_ms": 12694.329338,
+      "p99_ms": 14941.688857,
+      "max_ms": 15772.968121
+    },
+    "task.fence(timer)": {
+      "n": 100,
+      "mean_ms": 3925.77254889,
+      "p50_ms": 3822.586332,
+      "p95_ms": 4922.425278,
+      "p99_ms": 8223.495166,
+      "max_ms": 13919.907228
+    },
+    "task.fulfill": {
+      "n": 20,
+      "mean_ms": 6052.18416435,
+      "p50_ms": 5972.331005,
+      "p95_ms": 7357.839643,
+      "p99_ms": 7778.958315,
+      "max_ms": 7778.958315
+    },
+    "task.heartbeat": {
+      "n": 102,
+      "mean_ms": 3693.237091019608,
+      "p50_ms": 2930.955883,
+      "p95_ms": 8671.511972,
+      "p99_ms": 10491.596165,
+      "max_ms": 11138.496264
+    },
+    "task.suspend": {
+      "n": 100,
+      "mean_ms": 9082.45699011,
+      "p50_ms": 8328.33988,
+      "p95_ms": 13119.907193,
+      "p99_ms": 14174.663473,
+      "max_ms": 14542.50793
+    }
+  },
+  "request_errors": 0,
+  "errors": {},
+  "resources": [
+    {
+      "target": "pid:2887656",
+      "cpu_avg_pct": 0.39280198202422356,
+      "cpu_max_pct": 1.999848083540182,
+      "rss_avg_mb": 15.818791852678572,
+      "rss_max_mb": 17.5546875,
+      "samples": 280
+    }
+  ],
+  "notes": [
+    "server on this laptop; store TiDB Cloud Starter aws-eu-central-1 over WAN (TLS); pool 32"
+  ]
+}

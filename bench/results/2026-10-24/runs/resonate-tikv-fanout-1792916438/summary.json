@@ -1,0 +1,110 @@
+{
+  "run_id": "resonate-tikv-fanout-1792916438",
+  "system": "resonate",
+  "backend": "tikv",
+  "workload": "fanout",
+  "params": {
+    "concurrency": 20,
+    "k": 8,
+    "n": 500,
+    "wake": "push"
+  },
+  "started": 500,
+  "completed": 500,
+  "failed": 0,
+  "retries": 0,
+  "wall_s": 16.331686863,
+  "throughput_wf_s": 30.615331055162905,
+  "latency": {
+    "n": 500,
+    "mean_ms": 618.419165232,
+    "p50_ms": 328.684724,
+    "p95_ms": 1870.512531,
+    "p99_ms": 2311.357951,
+    "max_ms": 2324.188775
+  },
+  "steps": {
+    "activity": {
+      "n": 4000,
+      "mean_ms": 300.03113104375,
+      "p50_ms": 156.142042,
+      "p95_ms": 1132.331077,
+      "p99_ms": 1352.109715,
+      "max_ms": 1709.139276
+    }
+  },
+  "sleep_lateness": null,
+  "requests": {
+    "task.create": {
+      "n": 500,
+      "mean_ms": 149.363593294,
+      "p50_ms": 75.105438,
+      "p95_ms": 621.248341,
+      "p99_ms": 958.085156,
+      "max_ms": 1293.995699
+    },
+    "task.fence(promise.create)": {
+      "n": 4000,
+      "mean_ms": 153.8563204575,
+      "p50_ms": 73.790295,
+      "p95_ms": 691.63023,
+      "p99_ms": 957.352639,
+      "max_ms": 1292.677283
+    },
+    "task.fence(promise.settle)": {
+      "n": 4000,
+      "mean_ms": 146.056919878,
+      "p50_ms": 75.632007,
+      "p95_ms": 597.869763,
+      "p99_ms": 854.410879,
+      "max_ms": 1296.403831
+    },
+    "task.fulfill": {
+      "n": 500,
+      "mean_ms": 156.723381304,
+      "p50_ms": 74.531681,
+      "p95_ms": 658.842779,
+      "p99_ms": 917.584108,
+      "max_ms": 1292.542006
+    }
+  },
+  "request_errors": 0,
+  "errors": {},
+  "resources": [
+    {
+      "target": "pid:677087",
+      "cpu_avg_pct": 49.01863416232205,
+      "cpu_max_pct": 123.53548618857573,
+      "rss_avg_mb": 53.814697265625,
+      "rss_max_mb": 61.2578125,
+      "samples": 16
+    },
+    {
+      "target": "container:rbench-tikv-tikv",
+      "cpu_avg_pct": 21.51331709490833,
+      "cpu_max_pct": 54.40764944145977,
+      "rss_avg_mb": 977.275634765625,
+      "rss_max_mb": 1716.140625,
+      "samples": 16
+    },
+    {
+      "target": "container:rbench-tikv-pd",
+      "cpu_avg_pct": 9.28920374572361,
+      "cpu_max_pct": 21.037635018461096,
+      "rss_avg_mb": 103.21728515625,
+      "rss_max_mb": 120.203125,
+      "samples": 16
+    },
+    {
+      "target": "proc:rbench",
+      "cpu_avg_pct": 11.084695628850989,
+      "cpu_max_pct": 29.856623745570595,
+      "rss_avg_mb": 83.1171875,
+      "rss_max_mb": 111.76171875,
+      "samples": 16
+    }
+  ],
+  "notes": [
+    "loams/main b5177606 (FW1 TiKV store merged, FW10 tracing), one PD + one TiKV v8.5.8 in podman, API v2 keyspace resonate_bench, data on ext4 (/mnt/Projects); server tracing off (OTEL_SDK_DISABLED=true)"
+  ]
+}

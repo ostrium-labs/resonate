@@ -1,0 +1,110 @@
+{
+  "run_id": "loams-durable-tikv-fanout-1792917128",
+  "system": "loams-durable",
+  "backend": "tikv",
+  "workload": "fanout",
+  "params": {
+    "concurrency": 20,
+    "k": 8,
+    "n": 500,
+    "wake": "push"
+  },
+  "started": 500,
+  "completed": 500,
+  "failed": 0,
+  "retries": 0,
+  "wall_s": 11.17057472,
+  "throughput_wf_s": 44.76045436630856,
+  "latency": {
+    "n": 500,
+    "mean_ms": 439.908735856,
+    "p50_ms": 283.019453,
+    "p95_ms": 1623.58911,
+    "p99_ms": 2904.3158,
+    "max_ms": 2970.828207
+  },
+  "steps": {
+    "activity": {
+      "n": 4000,
+      "mean_ms": 250.724226273,
+      "p50_ms": 138.518172,
+      "p95_ms": 1371.537715,
+      "p99_ms": 2149.434387,
+      "max_ms": 2151.632437
+    }
+  },
+  "sleep_lateness": null,
+  "requests": {
+    "task.create": {
+      "n": 500,
+      "mean_ms": 96.780381968,
+      "p50_ms": 68.337672,
+      "p95_ms": 188.829659,
+      "p99_ms": 705.741693,
+      "max_ms": 753.345274
+    },
+    "task.fence(promise.create)": {
+      "n": 4000,
+      "mean_ms": 106.2133160455,
+      "p50_ms": 65.514304,
+      "p95_ms": 358.655252,
+      "p99_ms": 1334.637872,
+      "max_ms": 1337.45189
+    },
+    "task.fence(promise.settle)": {
+      "n": 4000,
+      "mean_ms": 144.4252849585,
+      "p50_ms": 72.025258,
+      "p95_ms": 708.101542,
+      "p99_ms": 1601.021917,
+      "max_ms": 1763.564526
+    },
+    "task.fulfill": {
+      "n": 500,
+      "mean_ms": 78.52393727799999,
+      "p50_ms": 64.331169,
+      "p95_ms": 178.500924,
+      "p99_ms": 273.504181,
+      "max_ms": 1086.130523
+    }
+  },
+  "request_errors": 0,
+  "errors": {},
+  "resources": [
+    {
+      "target": "container:rbench-loams",
+      "cpu_avg_pct": 61.16113993627004,
+      "cpu_max_pct": 105.95286870544196,
+      "rss_avg_mb": 205.0646306818182,
+      "rss_max_mb": 215.16796875,
+      "samples": 11
+    },
+    {
+      "target": "container:rbench-tikv-tikv",
+      "cpu_avg_pct": 22.353926553630576,
+      "cpu_max_pct": 40.4496326516716,
+      "rss_avg_mb": 1803.3998579545455,
+      "rss_max_mb": 1987.484375,
+      "samples": 11
+    },
+    {
+      "target": "container:rbench-tikv-pd",
+      "cpu_avg_pct": 10.294467300316226,
+      "cpu_max_pct": 16.413513187950127,
+      "rss_avg_mb": 66.29261363636364,
+      "rss_max_mb": 69.9609375,
+      "samples": 11
+    },
+    {
+      "target": "proc:rbench",
+      "cpu_avg_pct": 14.768938822139484,
+      "cpu_max_pct": 23.923831830542223,
+      "rss_avg_mb": 53.06818181818182,
+      "rss_max_mb": 61.16015625,
+      "samples": 11
+    }
+  ],
+  "notes": [
+    "Loams 0.1.1 engine (ghcr image), Resonate endpoint /durable/ on its main listener, embedded Resonate on TiKV v8.5.8 (one PD, one TiKV, API v2 keyspace loams_durable), data on ext4 (/mnt/Projects); --durable-push"
+  ]
+}

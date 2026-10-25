@@ -1,0 +1,5 @@
+rbench-temporal: mode=all workload=fanout n=500 k=8 l=5 sleep_ms=1000 concurrency=20 run=temporal-postgres-fanout-1792917465 address=127.0.0.1:17233 namespace=default task_queue=rbench
+rbench-temporal: starter: activity_timeout=10s wf_timeout=10m0s burst_start_workers=256
+rbench-temporal: worker: max_activities=200 max_workflow_tasks=200 activity_pollers=8 workflow_pollers=8 sticky_cache=10000
+rbench-temporal: otel: exporting spans to http://127.0.0.1:4317 as service rbench-temporal
+rbench-temporal: done: started=500 completed=500 failed=0 retries=1 in 52.423s (9.5 wf/s)

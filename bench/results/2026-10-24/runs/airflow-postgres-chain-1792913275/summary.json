@@ -1,0 +1,150 @@
+{
+  "run_id": "airflow-postgres-chain-1792913275",
+  "system": "airflow",
+  "backend": "postgres",
+  "workload": "chain",
+  "params": {
+    "concurrency": 20,
+    "l": 5,
+    "n": 100,
+    "poll_ms": 1000,
+    "sleep_ms": 1000
+  },
+  "started": 100,
+  "completed": 100,
+  "failed": 0,
+  "retries": 0,
+  "wall_s": 280.896998316,
+  "throughput_wf_s": 0.35600238023014846,
+  "latency": {
+    "n": 100,
+    "mean_ms": 55432.25867511,
+    "p50_ms": 43143.378824,
+    "p95_ms": 114368.910453,
+    "p99_ms": 115769.489754,
+    "max_ms": 115994.735331
+  },
+  "steps": {
+    "sleep": {
+      "n": 500,
+      "mean_ms": 3533.328844,
+      "p50_ms": 3385.687,
+      "p95_ms": 5007.135,
+      "p99_ms": 7069.841,
+      "max_ms": 7480.654
+    },
+    "task": {
+      "n": 500,
+      "mean_ms": 2504.023824,
+      "p50_ms": 1762.36,
+      "p95_ms": 5327.513,
+      "p99_ms": 16318.869,
+      "max_ms": 16322.424
+    }
+  },
+  "sleep_lateness": {
+    "n": 500,
+    "mean_ms": 2533.328844,
+    "p50_ms": 2385.687,
+    "p95_ms": 4007.135,
+    "p99_ms": 6069.841,
+    "max_ms": 6480.654
+  },
+  "requests": {
+    "dagRuns.create": {
+      "n": 100,
+      "mean_ms": 530.50987773,
+      "p50_ms": 308.410055,
+      "p95_ms": 1771.994036,
+      "p99_ms": 1896.321611,
+      "max_ms": 1929.643876
+    },
+    "dagRuns.get": {
+      "n": 5166,
+      "mean_ms": 61.42252941327913,
+      "p50_ms": 29.743315,
+      "p95_ms": 162.212086,
+      "p99_ms": 338.956345,
+      "max_ms": 3188.218525
+    },
+    "taskInstances.list": {
+      "n": 100,
+      "mean_ms": 121.56743034,
+      "p50_ms": 62.604027,
+      "p95_ms": 345.191495,
+      "p99_ms": 1773.20373,
+      "max_ms": 1854.42932
+    }
+  },
+  "request_errors": 0,
+  "errors": {},
+  "resources": [
+    {
+      "target": "container:rbench-airflow-api-server",
+      "cpu_avg_pct": 58.6155599962598,
+      "cpu_max_pct": 397.6041492388283,
+      "rss_avg_mb": 560.8423448741007,
+      "rss_max_mb": 1107.703125,
+      "samples": 278
+    },
+    {
+      "target": "container:rbench-airflow-scheduler",
+      "cpu_avg_pct": 25.102658575078966,
+      "cpu_max_pct": 65.02255941012481,
+      "rss_avg_mb": 143.2658357688849,
+      "rss_max_mb": 280.76171875,
+      "samples": 278
+    },
+    {
+      "target": "container:rbench-airflow-dag-processor",
+      "cpu_avg_pct": 13.572919149655684,
+      "cpu_max_pct": 67.63904715370653,
+      "rss_avg_mb": 95.29423336330935,
+      "rss_max_mb": 270.7265625,
+      "samples": 278
+    },
+    {
+      "target": "container:rbench-airflow-triggerer",
+      "cpu_avg_pct": 7.084702920160294,
+      "cpu_max_pct": 44.534049831334876,
+      "rss_avg_mb": 103.20653945593526,
+      "rss_max_mb": 266.97265625,
+      "samples": 278
+    },
+    {
+      "target": "container:rbench-airflow-edge-worker-1",
+      "cpu_avg_pct": 112.37128195410519,
+      "cpu_max_pct": 471.0562277452826,
+      "rss_avg_mb": 361.4513545413669,
+      "rss_max_mb": 1409.5703125,
+      "samples": 278
+    },
+    {
+      "target": "container:rbench-airflow-edge-worker-2",
+      "cpu_avg_pct": 111.58268666187982,
+      "cpu_max_pct": 442.1472881317658,
+      "rss_avg_mb": 361.7581075764389,
+      "rss_max_mb": 1748.7734375,
+      "samples": 278
+    },
+    {
+      "target": "container:rbench-airflow-postgres",
+      "cpu_avg_pct": 18.640025855686144,
+      "cpu_max_pct": 40.448663105768986,
+      "rss_avg_mb": 109.91227799010791,
+      "rss_max_mb": 144.01171875,
+      "samples": 278
+    },
+    {
+      "target": "proc:rbench",
+      "cpu_avg_pct": 1.5348179034971992,
+      "cpu_max_pct": 15.947810042090191,
+      "rss_avg_mb": 28.83543165467626,
+      "rss_max_mb": 43.5390625,
+      "samples": 278
+    }
+  ],
+  "notes": [
+    "Airflow 3.3.2 + edge3 4.3.2 (EdgeExecutor, 2 workers x 16 slots), one scheduler, Postgres 17.10 metadata DB on ext4 (/mnt/Projects); run end observed by polling each run every 1000 ms"
+  ]
+}

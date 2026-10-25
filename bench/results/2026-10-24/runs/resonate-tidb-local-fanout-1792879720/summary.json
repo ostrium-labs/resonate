@@ -1,0 +1,86 @@
+{
+  "run_id": "resonate-tidb-local-fanout-1792879720",
+  "system": "resonate",
+  "backend": "tidb-local",
+  "workload": "fanout",
+  "params": {
+    "concurrency": 10,
+    "k": 8,
+    "n": 100,
+    "wake": "push"
+  },
+  "started": 100,
+  "completed": 100,
+  "failed": 0,
+  "retries": 0,
+  "wall_s": 18.557838512,
+  "throughput_wf_s": 5.388558583228176,
+  "latency": {
+    "n": 100,
+    "mean_ms": 1714.1285642,
+    "p50_ms": 1147.990627,
+    "p95_ms": 5183.469376,
+    "p99_ms": 5910.061105,
+    "max_ms": 6105.66113
+  },
+  "steps": {
+    "activity": {
+      "n": 800,
+      "mean_ms": 995.70286079125,
+      "p50_ms": 630.935192,
+      "p95_ms": 3276.434952,
+      "p99_ms": 4030.600003,
+      "max_ms": 4674.498612
+    }
+  },
+  "sleep_lateness": null,
+  "requests": {
+    "task.create": {
+      "n": 100,
+      "mean_ms": 207.48290906,
+      "p50_ms": 134.178767,
+      "p95_ms": 704.083484,
+      "p99_ms": 948.367444,
+      "max_ms": 1098.600475
+    },
+    "task.fence(promise.create)": {
+      "n": 800,
+      "mean_ms": 432.74116658125,
+      "p50_ms": 266.4242,
+      "p95_ms": 1592.42952,
+      "p99_ms": 2259.886098,
+      "max_ms": 3008.54718
+    },
+    "task.fence(promise.settle)": {
+      "n": 800,
+      "mean_ms": 562.8558402025,
+      "p50_ms": 353.468602,
+      "p95_ms": 1836.032991,
+      "p99_ms": 2434.758222,
+      "max_ms": 2682.393684
+    },
+    "task.fulfill": {
+      "n": 100,
+      "mean_ms": 228.38762441999998,
+      "p50_ms": 147.195271,
+      "p95_ms": 823.78009,
+      "p99_ms": 1146.935977,
+      "max_ms": 1270.676335
+    }
+  },
+  "request_errors": 0,
+  "errors": {},
+  "resources": [
+    {
+      "target": "pid:795",
+      "cpu_avg_pct": 11.054453490341407,
+      "cpu_max_pct": 24.997096337289463,
+      "rss_avg_mb": 28.20073784722222,
+      "rss_max_mb": 33.9765625,
+      "samples": 18
+    }
+  ],
+  "notes": [
+    "RU measurement run (local TiDB v8.5.8)"
+  ]
+}

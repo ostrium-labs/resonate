@@ -1,0 +1,96 @@
+{
+  "run_id": "resonate-tidb-alicloud-ap-southeast-1-fanout-1792868121",
+  "system": "resonate",
+  "backend": "tidb-alicloud-ap-southeast-1",
+  "workload": "fanout",
+  "params": {
+    "concurrency": 4,
+    "k": 8,
+    "n": 40,
+    "wake": "push"
+  },
+  "started": 40,
+  "completed": 39,
+  "failed": 1,
+  "retries": 0,
+  "wall_s": 431.012251706,
+  "throughput_wf_s": 0.09048466684098459,
+  "latency": {
+    "n": 39,
+    "mean_ms": 42337.62262046154,
+    "p50_ms": 41169.8139,
+    "p95_ms": 62381.690048,
+    "p99_ms": 66687.953893,
+    "max_ms": 66687.953893
+  },
+  "steps": {
+    "activity": {
+      "n": 320,
+      "mean_ms": 25897.253660221875,
+      "p50_ms": 25811.187915,
+      "p95_ms": 39830.875556,
+      "p99_ms": 53666.036356,
+      "max_ms": 59183.222691
+    }
+  },
+  "sleep_lateness": null,
+  "requests": {
+    "task.create": {
+      "n": 40,
+      "mean_ms": 2672.066107125,
+      "p50_ms": 2551.747494,
+      "p95_ms": 3603.699114,
+      "p99_ms": 5840.026323,
+      "max_ms": 5840.026323
+    },
+    "task.fence(promise.create)": {
+      "n": 320,
+      "mean_ms": 7335.01703630625,
+      "p50_ms": 7066.038106,
+      "p95_ms": 12892.470279,
+      "p99_ms": 19417.280659,
+      "max_ms": 23964.506524
+    },
+    "task.fence(promise.settle)": {
+      "n": 320,
+      "mean_ms": 18562.13774771875,
+      "p50_ms": 18119.953152,
+      "p95_ms": 27236.202648,
+      "p99_ms": 34626.888635,
+      "max_ms": 37372.499506
+    },
+    "task.fulfill": {
+      "n": 40,
+      "mean_ms": 3548.1332111750003,
+      "p50_ms": 3487.76628,
+      "p95_ms": 4204.328102,
+      "p99_ms": 5528.730144,
+      "max_ms": 5528.730144
+    },
+    "task.heartbeat": {
+      "n": 40,
+      "mean_ms": 16911.571610575,
+      "p50_ms": 15635.67103,
+      "p95_ms": 33855.261009,
+      "p99_ms": 36729.078685,
+      "max_ms": 36729.078685
+    }
+  },
+  "request_errors": 1,
+  "errors": {
+    "task.fulfill 409: Task version mismatch or invalid state": 1
+  },
+  "resources": [
+    {
+      "target": "pid:3337954",
+      "cpu_avg_pct": 0.320122142738095,
+      "cpu_max_pct": 1.999817962570321,
+      "rss_avg_mb": 25.322252030162414,
+      "rss_max_mb": 29.45703125,
+      "samples": 431
+    }
+  ],
+  "notes": [
+    "server on this laptop; store TiDB Cloud Starter alicloud-ap-southeast-1 over WAN (TLS); pool 32"
+  ]
+}

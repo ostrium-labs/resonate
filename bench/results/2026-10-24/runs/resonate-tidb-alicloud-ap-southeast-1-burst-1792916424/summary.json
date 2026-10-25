@@ -1,0 +1,85 @@
+{
+  "run_id": "resonate-tidb-alicloud-ap-southeast-1-burst-1792916424",
+  "system": "resonate",
+  "backend": "tidb-alicloud-ap-southeast-1",
+  "workload": "burst",
+  "params": {
+    "concurrency": 50,
+    "n": 50,
+    "wake": "push"
+  },
+  "started": 50,
+  "completed": 50,
+  "failed": 0,
+  "retries": 0,
+  "wall_s": 21.071346257,
+  "throughput_wf_s": 2.3728906255047546,
+  "latency": {
+    "n": 50,
+    "mean_ms": 18529.09607224,
+    "p50_ms": 18814.381977,
+    "p95_ms": 20860.795848,
+    "p99_ms": 21070.754801,
+    "max_ms": 21070.754801
+  },
+  "steps": {
+    "activity": {
+      "n": 50,
+      "mean_ms": 8920.457389700001,
+      "p50_ms": 9001.049253,
+      "p95_ms": 10199.779039,
+      "p99_ms": 11563.736993,
+      "max_ms": 11563.736993
+    }
+  },
+  "sleep_lateness": null,
+  "requests": {
+    "task.create": {
+      "n": 50,
+      "mean_ms": 4598.9340984,
+      "p50_ms": 3668.608089,
+      "p95_ms": 6149.375424,
+      "p99_ms": 7562.611302,
+      "max_ms": 7562.611302
+    },
+    "task.fence(promise.create)": {
+      "n": 50,
+      "mean_ms": 3504.2858831,
+      "p50_ms": 3330.443381,
+      "p95_ms": 4705.11006,
+      "p99_ms": 5416.390604,
+      "max_ms": 5416.390604
+    },
+    "task.fence(promise.settle)": {
+      "n": 50,
+      "mean_ms": 5416.070993640001,
+      "p50_ms": 5499.227974,
+      "p95_ms": 6348.931072,
+      "p99_ms": 7170.033249,
+      "max_ms": 7170.033249
+    },
+    "task.fulfill": {
+      "n": 50,
+      "mean_ms": 5009.53043016,
+      "p50_ms": 4910.955461,
+      "p95_ms": 6144.95717,
+      "p99_ms": 6349.428814,
+      "max_ms": 6349.428814
+    }
+  },
+  "request_errors": 0,
+  "errors": {},
+  "resources": [
+    {
+      "target": "pid:630134",
+      "cpu_avg_pct": 1.5452345657166013,
+      "cpu_max_pct": 2.9997271058260013,
+      "rss_avg_mb": 25.74911221590909,
+      "rss_max_mb": 27.68359375,
+      "samples": 22
+    }
+  ],
+  "notes": [
+    "server on this laptop; store TiDB Cloud Starter alicloud-ap-southeast-1 over WAN (TLS); pool 32"
+  ]
+}

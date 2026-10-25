@@ -1,0 +1,11 @@
+# per-statement RU, mean of 20 each, @@tidb_last_query_info, 2026-10-25
+## local TiDB v8.5.8 (resource control on)
+autocommit_update 3.283
+insert 2.903
+point_get 0.524
+select_for_update 1.700
+## TiDB Cloud Starter aws-us-west-2 (v8.5.3-serverless)
+autocommit_update 7.226
+insert 6.728
+point_get 0.497
+select_for_update 2.550

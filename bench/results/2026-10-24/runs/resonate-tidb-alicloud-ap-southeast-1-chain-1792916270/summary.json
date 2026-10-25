@@ -1,0 +1,126 @@
+{
+  "run_id": "resonate-tidb-alicloud-ap-southeast-1-chain-1792916270",
+  "system": "resonate",
+  "backend": "tidb-alicloud-ap-southeast-1",
+  "workload": "chain",
+  "params": {
+    "concurrency": 10,
+    "l": 5,
+    "n": 20,
+    "sleep_ms": 1000,
+    "wake": "push"
+  },
+  "started": 20,
+  "completed": 20,
+  "failed": 0,
+  "retries": 0,
+  "wall_s": 151.509746675,
+  "throughput_wf_s": 0.13200470886471435,
+  "latency": {
+    "n": 20,
+    "mean_ms": 71728.68575325,
+    "p50_ms": 74255.398042,
+    "p95_ms": 83485.635383,
+    "p99_ms": 84915.94416,
+    "max_ms": 84915.94416
+  },
+  "steps": {
+    "activity": {
+      "n": 100,
+      "mean_ms": 5951.66626507,
+      "p50_ms": 5732.060273,
+      "p95_ms": 7783.974155,
+      "p99_ms": 8800.601329,
+      "max_ms": 9146.548999
+    },
+    "sleep": {
+      "n": 100,
+      "mean_ms": 7301.60259488,
+      "p50_ms": 6758.649176,
+      "p95_ms": 10200.897983,
+      "p99_ms": 13085.390947,
+      "max_ms": 13510.329485
+    }
+  },
+  "sleep_lateness": {
+    "n": 100,
+    "mean_ms": 6302.046794350001,
+    "p50_ms": 5759.148742,
+    "p95_ms": 9201.733143,
+    "p99_ms": 12085.521496,
+    "max_ms": 12510.721125
+  },
+  "requests": {
+    "task.create": {
+      "n": 20,
+      "mean_ms": 2070.3026178,
+      "p50_ms": 1848.178802,
+      "p95_ms": 2933.731291,
+      "p99_ms": 3325.440649,
+      "max_ms": 3325.440649
+    },
+    "task.fence(promise.create)": {
+      "n": 100,
+      "mean_ms": 2231.1589955,
+      "p50_ms": 2049.213931,
+      "p95_ms": 3591.584193,
+      "p99_ms": 3890.992701,
+      "max_ms": 4169.063934
+    },
+    "task.fence(promise.settle)": {
+      "n": 100,
+      "mean_ms": 3720.38596267,
+      "p50_ms": 3671.100292,
+      "p95_ms": 4909.492135,
+      "p99_ms": 4974.877401,
+      "max_ms": 5320.855209
+    },
+    "task.fence(timer)": {
+      "n": 100,
+      "mean_ms": 2196.2920512399996,
+      "p50_ms": 2048.096609,
+      "p95_ms": 3033.324119,
+      "p99_ms": 3424.533586,
+      "max_ms": 3592.972603
+    },
+    "task.fulfill": {
+      "n": 20,
+      "mean_ms": 3370.18285175,
+      "p50_ms": 3297.542514,
+      "p95_ms": 4502.091943,
+      "p99_ms": 4908.203773,
+      "max_ms": 4908.203773
+    },
+    "task.heartbeat": {
+      "n": 50,
+      "mean_ms": 3083.2655439,
+      "p50_ms": 3378.097548,
+      "p95_ms": 4989.507522,
+      "p99_ms": 6002.798878,
+      "max_ms": 6002.798878
+    },
+    "task.suspend": {
+      "n": 100,
+      "mean_ms": 5105.19899652,
+      "p50_ms": 4506.006033,
+      "p95_ms": 7368.8144,
+      "p99_ms": 11249.772206,
+      "max_ms": 11270.100441
+    }
+  },
+  "request_errors": 0,
+  "errors": {},
+  "resources": [
+    {
+      "target": "pid:630134",
+      "cpu_avg_pct": 0.7762265126731598,
+      "cpu_max_pct": 2.9994952089522955,
+      "rss_avg_mb": 19.197317023026315,
+      "rss_max_mb": 20.85546875,
+      "samples": 152
+    }
+  ],
+  "notes": [
+    "server on this laptop; store TiDB Cloud Starter alicloud-ap-southeast-1 over WAN (TLS); pool 32"
+  ]
+}

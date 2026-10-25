@@ -1,0 +1,8 @@
+# Put Airflow's metadata DB on $RBENCH_DATA, the disk every local leg uses.
+volumes:
+  pgdata:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${RBENCH_DATA:?set RBENCH_DATA}/airflow-pg
