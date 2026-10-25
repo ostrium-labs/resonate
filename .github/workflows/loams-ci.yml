@@ -65,11 +65,11 @@ jobs:
   stores:
     name: Linearizability (${{ matrix.backend }})
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 90
     strategy:
       fail-fast: false
       matrix:
-        backend: [sqlite, tidb]
+        backend: [sqlite, tidb, tikv]
     steps:
       - uses: actions/checkout@v5
       - uses: actions-rust-lang/setup-rust-toolchain@v1
@@ -94,8 +94,22 @@ jobs:
           done
           docker logs tidb; echo "tidb did not open port 4000"; exit 1
 
+      # PD + TiKV v8.5.8 on API v2 (keyspaces), single node, host network.
+      - name: Start TiKV
+        if: matrix.backend == 'tikv'
+        run: test/tikv/up.sh 2379 20160
+
+      # The TiKV store's own tests: the blob differential on TiKV, the store
+      # contract, the on-disk layout and the Loams 0.1.x fixture.
+      - name: TiKV store tests
+        if: matrix.backend == 'tikv'
+        env:
+          XTASK_TIKV_PD: 127.0.0.1:2379
+        run: cargo xtask differential --backend tikv
+
       - name: Linearizability
         env:
+          XTASK_TIKV_PD: 127.0.0.1:2379
           XTASK_TIDB_ADMIN_URL: mysql://root@127.0.0.1:4000/mysql
           XTASK_SPEC_DIR: ${{ github.workspace }}/spec/valid/porc
         run: cargo xtask porcupine --backend ${{ matrix.backend }}

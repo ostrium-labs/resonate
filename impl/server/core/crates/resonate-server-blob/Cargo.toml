@@ -20,3 +20,13 @@ chrono = "0.4"
 lazy_static = "1"
 futures = "0.3"
 fastrand = "2"
+# The TiKV store and the `resonate-server-tikv` plugin (src/tikv). The client
+# is Ostrium Labs' fork of tikv/client-rust (Apache-2.0), pinned at the
+# revision Loams uses, so an embedder builds a single copy of it.
+tikv-client = { git = "https://github.com/ostrium-labs/client-rust", rev = "41b3588f9b63d505dd61e15bf3d26abfd53689a2", default-features = false, optional = true }
+uuid = { version = "1", features = ["v4"], optional = true }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"], optional = true }
+
+[features]
+tikv = ["dep:tikv-client", "dep:uuid", "dep:reqwest"]
+

@@ -79,6 +79,41 @@ fn req(kind: &str, data: Value) -> RequestEnvelope {
 
 type Backend = Arc<dyn ResonateServer>;
 
+/// The blob server under test: in memory, or on TiKV when `TEST_TIKV_PD`
+/// names a PD (feature `tikv`), under a fresh root in `TEST_TIKV_KEYSPACE`.
+async fn blob_server() -> Arc<Server> {
+    let cfg = ServerCfg {
+        debug: true,
+        search: true,
+        ..Default::default()
+    };
+    #[cfg(feature = "tikv")]
+    if let Some(pd) = std::env::var("TEST_TIKV_PD").ok().filter(|s| !s.is_empty()) {
+        use resonate_server_blob::tikv::{
+            ensure_keyspace, keyspace::pd_http_url, TikvStore, TikvStoreCfg,
+        };
+        let keyspace =
+            std::env::var("TEST_TIKV_KEYSPACE").unwrap_or_else(|_| "resonate_test".into());
+        let endpoints: Vec<String> = pd.split(',').map(str::to_owned).collect();
+        ensure_keyspace(&pd_http_url(&endpoints[0]), &keyspace)
+            .await
+            .expect("TEST_TIKV_PD keyspace");
+        let mut store = TikvStoreCfg::new(endpoints, keyspace);
+        store.root = format!("diff-{:016x}/", fastrand::u64(..)).into_bytes();
+        eprintln!(
+            "[differential] blob on TiKV {pd}, root {}",
+            String::from_utf8_lossy(&store.root)
+        );
+        let store = TikvStore::connect(store).await.expect("TEST_TIKV_PD");
+        return Server::build(
+            Arc::new(store),
+            Arc::new(resonate_server_blob::sender::NullRouter),
+            cfg,
+        );
+    }
+    Server::in_memory(cfg)
+}
+
 /// Send one request to a backend at time `now`.
 ///
 /// `now` rides in `head.debug_time`: the server resolves the effective time
@@ -109,11 +144,7 @@ fn pick<T: Clone>(rng: &mut fastrand::Rng, v: &[T]) -> Option<T> {
 async fn differential_random() {
     debug_assert_eq!(22, ALL_OPS.len(), "Op has 22 variants; ALL_OPS must match");
 
-    let server = Server::in_memory(ServerCfg {
-        debug: true,
-        search: true,
-        ..Default::default()
-    });
+    let server = blob_server().await;
     let oracle = Arc::new(SharedOracle::with_preload_limit(PRELOAD_LIMIT));
 
     let backends: Vec<(String, Backend)> = vec![
