@@ -55,6 +55,29 @@ pub struct MysqlEngine {
 }
 
 impl MysqlEngine {
+    /// The isolation level and, on TiDB, the transaction mode of a session
+    /// from this engine's pool: what `connect` pinned. For tests.
+    #[doc(hidden)]
+    pub async fn session_probe(&self) -> Result<(String, Option<String>), sqlx::Error> {
+        let mut conn = self.pool.acquire().await?;
+        let isolation: String = sqlx::query_scalar("SELECT @@transaction_isolation")
+            .fetch_one(&mut *conn)
+            .await?;
+        let version: String = sqlx::query_scalar("SELECT VERSION()")
+            .fetch_one(&mut *conn)
+            .await?;
+        let mode = if version.contains("TiDB") {
+            Some(
+                sqlx::query_scalar("SELECT @@tidb_txn_mode")
+                    .fetch_one(&mut *conn)
+                    .await?,
+            )
+        } else {
+            None
+        };
+        Ok((isolation, mode))
+    }
+
     pub async fn connect(
         url: &str,
         pool_size: u32,
