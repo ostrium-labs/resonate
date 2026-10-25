@@ -1,0 +1,85 @@
+{
+  "run_id": "tidb5x-burst-n50-i2",
+  "system": "resonate",
+  "backend": "tidb5x-aws-ap-southeast-1-i2",
+  "workload": "burst",
+  "params": {
+    "concurrency": 50,
+    "n": 50,
+    "wake": "push"
+  },
+  "started": 50,
+  "completed": 50,
+  "failed": 0,
+  "retries": 0,
+  "wall_s": 14.235377911,
+  "throughput_wf_s": 3.51237601928108,
+  "latency": {
+    "n": 50,
+    "mean_ms": 10470.47489838,
+    "p50_ms": 10511.050547,
+    "p95_ms": 14029.84381,
+    "p99_ms": 14235.301902,
+    "max_ms": 14235.301902
+  },
+  "steps": {
+    "activity": {
+      "n": 50,
+      "mean_ms": 4109.62502024,
+      "p50_ms": 3758.767749,
+      "p95_ms": 6225.017141,
+      "p99_ms": 7809.159336,
+      "max_ms": 7809.159336
+    }
+  },
+  "sleep_lateness": null,
+  "requests": {
+    "task.create": {
+      "n": 50,
+      "mean_ms": 3028.21122942,
+      "p50_ms": 2911.017302,
+      "p95_ms": 5051.352797,
+      "p99_ms": 5438.544669,
+      "max_ms": 5438.544669
+    },
+    "task.fence(promise.create)": {
+      "n": 50,
+      "mean_ms": 1626.70558218,
+      "p50_ms": 1463.983696,
+      "p95_ms": 3215.501124,
+      "p99_ms": 3770.776231,
+      "max_ms": 3770.776231
+    },
+    "task.fence(promise.settle)": {
+      "n": 50,
+      "mean_ms": 2482.82766956,
+      "p50_ms": 2337.636826,
+      "p95_ms": 3907.732007,
+      "p99_ms": 4593.391077,
+      "max_ms": 4593.391077
+    },
+    "task.fulfill": {
+      "n": 50,
+      "mean_ms": 3332.49907072,
+      "p50_ms": 3435.987206,
+      "p95_ms": 4452.244972,
+      "p99_ms": 4468.424596,
+      "max_ms": 4468.424596
+    }
+  },
+  "request_errors": 0,
+  "errors": {},
+  "resources": [
+    {
+      "target": "pid:1081238",
+      "cpu_avg_pct": 2.266451265560011,
+      "cpu_max_pct": 5.999541964968684,
+      "rss_avg_mb": 43.66354166666667,
+      "rss_max_mb": 45.1796875,
+      "samples": 15
+    }
+  ],
+  "notes": [
+    "5 Starter instances at once (aws-ap-southeast-1), instance 2 of 5, pool 64; step n50"
+  ]
+}

@@ -38,6 +38,8 @@
 | burst | temporal | postgres | concurrency=500 n=500 | 500/500 | 22.71 | 12619 | 20809 | 21212 | 68.9 / 873.1 | – | 0 | 0 | 117 | 714 | 21.62→21.35 |
 | burst | temporal | postgres | concurrency=500 n=500 | 500/500 | 37.62 | 7888 | 11405 | 11775 | 32.7 / 511.1 | – | 0 | 0 | 181 | 751 | 22.29→20.99 |
 | burst | temporal | postgres | concurrency=500 n=500 | 500/500 | 21.42 | 13840 | 21634 | 22727 | 65.2 / 938.8 | – | 0 | 0 | 104 | 737 | 118.86→85.42 |
+| burst | temporal | postgres | concurrency=500 n=500 | 500/500 | 8.01 | 25707 | 46199 | 50310 | 188.9 / 1314.5 | – | 0 | 0 | 42 | 832 | 27.99→74.25 |
+| burst | temporal-gateway | resonate-postgres | concurrency=500 n=500 | 0/0 | 0.00 | 0 | 0 | 0 | 24061.1 / 31077.3 | – | 0 | 0 | 200 | 321 | 15.00→14.60 |
 | chain | airflow | postgres | concurrency=20 l=5 n=100 poll_ms=100 sleep_ms=1000 | 100/100 | 0.38 | 47880 | 67656 | 68157 | 2434.8 / 12269.0 | 2773.0 / 6695.1 | 0 | 0 | 621 | 5332 | 38.10→34.62 |
 | chain | airflow | postgres | concurrency=20 l=5 n=100 poll_ms=100 sleep_ms=1000 | 100/100 | 0.35 | 50516 | 70116 | 72379 | 2908.3 / 6638.0 | 3301.2 / 6712.1 | 0 | 0 | 589 | 4436 | 22.06→57.69 |
 | chain | airflow | postgres | concurrency=20 l=5 n=100 poll_ms=1000 sleep_ms=1000 | 100/100 | 0.36 | 43143 | 114369 | 115769 | 1762.4 / 16318.9 | 2385.7 / 6069.8 | 0 | 0 | 349 | 5272 | 34.87→37.59 |
@@ -75,6 +77,7 @@
 | chain | temporal | postgres | concurrency=20 l=5 n=100 sleep_ms=1000 | 100/100 | 2.28 | 7259 | 9900 | 10307 | 40.9 / 508.9 | 103.0 / 1845.8 | 0 | 0 | 51 | 601 | 31.36→21.62 |
 | chain | temporal | postgres | concurrency=20 l=5 n=100 sleep_ms=1000 | 100/100 | 2.10 | 6452 | 17250 | 17539 | 16.1 / 517.4 | 41.5 / 4636.8 | 0 | 0 | 56 | 591 | 21.79→22.29 |
 | chain | temporal | postgres | concurrency=20 l=5 n=100 sleep_ms=1000 | 100/100 | 1.94 | 8806 | 13826 | 17983 | 67.9 / 625.3 | 260.2 / 1659.6 | 0 | 0 | 46 | 586 | 199.68→118.86 |
+| chain | temporal-gateway | resonate-postgres | concurrency=20 l=5 n=100 sleep_ms=1000 | 0/0 | 0.00 | 0 | 0 | 0 | 0.0 / 0.0 | – | 0 | 0 | 177 | 299 | 14.60→13.47 |
 | fanout | airflow | postgres | concurrency=20 k=8 n=500 poll_ms=100 | 500/500 | 0.68 | 28090 | 37003 | 50484 | 6680.1 / 17302.1 | – | 0 | 0 | 720 | 6434 | 11.92→38.10 |
 | fanout | airflow | postgres | concurrency=20 k=8 n=500 poll_ms=100 | 497/500 | 0.42 | 25309 | 45653 | 93020 | 6119.8 / 28651.6 | – | 2171 | 0 | 471 | 6396 | 16.76→22.06 |
 | fanout | airflow | postgres | concurrency=20 k=8 n=500 poll_ms=1000 | 496/500 | 0.27 | 39931 | 63041 | 146046 | 9705.0 / 40490.7 | – | 451 | 0 | 393 | 7149 | 31.55→37.64 |
@@ -112,3 +115,6 @@
 | fanout | temporal | postgres | concurrency=20 k=8 n=500 | 500/500 | 3.32 | 4163 | 18444 | 26968 | 460.8 / 11633.9 | – | 0 | 6 | 52 | 557 | 15.66→31.36 |
 | fanout | temporal | postgres | concurrency=20 k=8 n=500 | 500/500 | 9.09 | 1555 | 6050 | 8096 | 287.9 / 4773.8 | – | 0 | 0 | 141 | 593 | 18.39→21.79 |
 | fanout | temporal | postgres | concurrency=20 k=8 n=500 | 500/500 | 9.54 | 1878 | 4201 | 5432 | 290.9 / 3433.4 | – | 0 | 1 | 132 | 587 | 232.05→199.68 |
+| fanout | temporal | postgres | concurrency=20 k=8 n=500 | 498/500 | 7.00 | 583 | 8729 | 35276 | 144.7 / 28835.5 | – | 2 | 15 | 111 | 667 | 9.89→27.99 |
+| fanout | temporal-gateway | resonate-postgres | concurrency=20 k=8 n=500 | 500/500 | 1.31 | 15730 | 24719 | 28159 | 3461.6 / 14431.0 | – | 0 | 0 | 149 | 331 | 25.73→15.00 |
+| fanout | temporal-gateway | resonate-postgres | concurrency=20 k=8 n=500 | 220/220 | 0.95 | 21731 | 40936 | 42064 | 4418.7 / 24512.0 | – | 0 | 0 | 65 | 375 | 39.45→24.38 |

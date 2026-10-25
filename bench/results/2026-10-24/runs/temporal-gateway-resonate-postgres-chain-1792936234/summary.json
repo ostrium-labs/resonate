@@ -1,0 +1,70 @@
+{
+  "run_id": "temporal-gateway-resonate-postgres-chain-1792936234",
+  "system": "temporal-gateway",
+  "backend": "resonate-postgres",
+  "workload": "chain",
+  "params": {
+    "concurrency": 20,
+    "l": 5,
+    "n": 100,
+    "sleep_ms": 1000
+  },
+  "started": 0,
+  "completed": 0,
+  "failed": 0,
+  "retries": 0,
+  "wall_s": 0.0,
+  "throughput_wf_s": 0.0,
+  "latency": {
+    "n": 0,
+    "mean_ms": 0.0,
+    "p50_ms": 0.0,
+    "p95_ms": 0.0,
+    "p99_ms": 0.0,
+    "max_ms": 0.0
+  },
+  "steps": {},
+  "sleep_lateness": null,
+  "requests": {},
+  "request_errors": 0,
+  "errors": {},
+  "resources": [
+    {
+      "target": "pid:1176751",
+      "cpu_avg_pct": 104.37966503734005,
+      "cpu_max_pct": 108.97773181721367,
+      "rss_avg_mb": 30.035677083333333,
+      "rss_max_mb": 31.64453125,
+      "samples": 60
+    },
+    {
+      "target": "pid:1176913",
+      "cpu_avg_pct": 4.531799844526813,
+      "cpu_max_pct": 10.997527546854444,
+      "rss_avg_mb": 21.179231770833333,
+      "rss_max_mb": 30.95703125,
+      "samples": 60
+    },
+    {
+      "target": "container:rbench-pg",
+      "cpu_avg_pct": 65.88935497005225,
+      "cpu_max_pct": 150.47038616788896,
+      "rss_avg_mb": 151.65416666666667,
+      "rss_max_mb": 187.12109375,
+      "samples": 60
+    },
+    {
+      "target": "pid:1204069",
+      "cpu_avg_pct": 2.332518330652926,
+      "cpu_max_pct": 10.997628515377457,
+      "rss_avg_mb": 37.75123697916667,
+      "rss_max_mb": 49.41015625,
+      "samples": 60
+    }
+  ],
+  "notes": [
+    "Temporal Go SDK 1.49.0 through the Loams Temporal gateway (DX1, loams dx1-t9-binary loams-temporal-267f1f441), history store postgres; Resonate resonate-loams-main-4656e2fd on Postgres 17.10; both databases in one rbench-pg container, data on ext4 (/mnt/Projects)",
+    "driver exited with Some(2)",
+    "driver printed no done record"
+  ]
+}

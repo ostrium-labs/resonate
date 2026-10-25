@@ -1,0 +1,96 @@
+{
+  "run_id": "tidb5x-burst-p256-n1000-i1",
+  "system": "resonate",
+  "backend": "tidb5x-aws-ap-southeast-1-i1",
+  "workload": "burst",
+  "params": {
+    "concurrency": 1000,
+    "n": 1000,
+    "wake": "push"
+  },
+  "started": 1000,
+  "completed": 75,
+  "failed": 925,
+  "retries": 0,
+  "wall_s": 53.550234445,
+  "throughput_wf_s": 1.4005540923827415,
+  "latency": {
+    "n": 75,
+    "mean_ms": 52117.48079152,
+    "p50_ms": 51824.72314,
+    "p95_ms": 53159.461472,
+    "p99_ms": 53527.167979,
+    "max_ms": 53545.594084
+  },
+  "steps": {
+    "activity": {
+      "n": 75,
+      "mean_ms": 12072.01212668,
+      "p50_ms": 10877.634429,
+      "p95_ms": 14246.329209,
+      "p99_ms": 37354.108469,
+      "max_ms": 40661.138961
+    }
+  },
+  "sleep_lateness": null,
+  "requests": {
+    "task.create": {
+      "n": 1000,
+      "mean_ms": 26500.273867615,
+      "p50_ms": 29664.13136,
+      "p95_ms": 36264.254982,
+      "p99_ms": 37853.030239,
+      "max_ms": 38166.632467
+    },
+    "task.fence(promise.create)": {
+      "n": 609,
+      "mean_ms": 10949.639773195402,
+      "p50_ms": 9930.133072,
+      "p95_ms": 21026.365023,
+      "p99_ms": 25695.153022,
+      "max_ms": 33754.057896
+    },
+    "task.fence(promise.settle)": {
+      "n": 75,
+      "mean_ms": 6770.501595453333,
+      "p50_ms": 6952.928817,
+      "p95_ms": 7433.594961,
+      "p99_ms": 7476.023018,
+      "max_ms": 7540.197477
+    },
+    "task.fulfill": {
+      "n": 75,
+      "mean_ms": 4232.50773136,
+      "p50_ms": 3575.938949,
+      "p95_ms": 5887.396604,
+      "p99_ms": 5928.308022,
+      "max_ms": 5991.877021
+    },
+    "task.heartbeat": {
+      "n": 14,
+      "mean_ms": 2001.701161142857,
+      "p50_ms": 1295.04072,
+      "p95_ms": 5479.93039,
+      "p99_ms": 5656.960004,
+      "max_ms": 5656.960004
+    }
+  },
+  "request_errors": 939,
+  "errors": {
+    "fence create 500: Internal error: Storage error: error communicating with databa": 534,
+    "task.create 500: Internal error: Storage error: pool timed out while waiting for": 391
+  },
+  "resources": [
+    {
+      "target": "pid:1153295",
+      "cpu_avg_pct": 3.949447852090572,
+      "cpu_max_pct": 21.997988943850753,
+      "rss_avg_mb": 95.66124487704919,
+      "rss_max_mb": 113.26171875,
+      "samples": 61
+    }
+  ],
+  "notes": [
+    "5 Starter instances at once (aws-ap-southeast-1), instance 1 of 5, pool 256; step p256-n1000"
+  ]
+}

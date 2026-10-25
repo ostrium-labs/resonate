@@ -1,0 +1,55 @@
+{
+  "run_id": "tidb5x-fanout-p256-c64-i4",
+  "system": "resonate",
+  "backend": "tidb5x-aws-ap-southeast-1-i4",
+  "workload": "fanout",
+  "params": {
+    "concurrency": 64,
+    "k": 8,
+    "n": 128,
+    "wake": "push"
+  },
+  "started": 128,
+  "completed": 0,
+  "failed": 128,
+  "retries": 0,
+  "wall_s": 60.701605602,
+  "throughput_wf_s": 0.0,
+  "latency": {
+    "n": 0,
+    "mean_ms": 0.0,
+    "p50_ms": 0.0,
+    "p95_ms": 0.0,
+    "p99_ms": 0.0,
+    "max_ms": 0.0
+  },
+  "steps": {},
+  "sleep_lateness": null,
+  "requests": {
+    "task.create": {
+      "n": 128,
+      "mean_ms": 30005.6645874375,
+      "p50_ms": 30003.472611,
+      "p95_ms": 30025.05218,
+      "p99_ms": 30033.337988,
+      "max_ms": 30040.79369
+    }
+  },
+  "request_errors": 128,
+  "errors": {
+    "task.create 500: Internal error: Storage error: pool timed out while waiting for": 128
+  },
+  "resources": [
+    {
+      "target": "pid:1154175",
+      "cpu_avg_pct": 0.5409113887770747,
+      "cpu_max_pct": 12.997814560457622,
+      "rss_avg_mb": 27.879290471311474,
+      "rss_max_mb": 39.81640625,
+      "samples": 61
+    }
+  ],
+  "notes": [
+    "5 Starter instances at once (aws-ap-southeast-1), instance 4 of 5, pool 256; step p256-c64"
+  ]
+}

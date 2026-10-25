@@ -1,0 +1,97 @@
+{
+  "run_id": "tidb5x-fanout-p256-c64-i1",
+  "system": "resonate",
+  "backend": "tidb5x-aws-ap-southeast-1-i1",
+  "workload": "fanout",
+  "params": {
+    "concurrency": 64,
+    "k": 8,
+    "n": 128,
+    "wake": "push"
+  },
+  "started": 128,
+  "completed": 35,
+  "failed": 93,
+  "retries": 57,
+  "wall_s": 306.849051345,
+  "throughput_wf_s": 0.1140625980317873,
+  "latency": {
+    "n": 35,
+    "mean_ms": 84571.74939094286,
+    "p50_ms": 84121.930481,
+    "p95_ms": 88130.38934,
+    "p99_ms": 122323.739229,
+    "max_ms": 122323.739229
+  },
+  "steps": {
+    "activity": {
+      "n": 280,
+      "mean_ms": 59317.33077773929,
+      "p50_ms": 67150.521401,
+      "p95_ms": 81281.548137,
+      "p99_ms": 108511.266962,
+      "max_ms": 116409.51173
+    }
+  },
+  "sleep_lateness": null,
+  "requests": {
+    "task.create": {
+      "n": 128,
+      "mean_ms": 22146.785014070312,
+      "p50_ms": 30002.794254,
+      "p95_ms": 30066.907915,
+      "p99_ms": 30123.026785,
+      "max_ms": 30124.519363
+    },
+    "task.fence(promise.create)": {
+      "n": 307,
+      "mean_ms": 21714.950567019543,
+      "p50_ms": 19866.459015,
+      "p95_ms": 37105.880533,
+      "p99_ms": 60015.025772,
+      "max_ms": 60578.14671
+    },
+    "task.fence(promise.settle)": {
+      "n": 339,
+      "mean_ms": 41193.04400356047,
+      "p50_ms": 46485.700674,
+      "p95_ms": 60001.619179,
+      "p99_ms": 60002.697794,
+      "max_ms": 60150.151751
+    },
+    "task.fulfill": {
+      "n": 35,
+      "mean_ms": 3173.821623714286,
+      "p50_ms": 3044.305838,
+      "p95_ms": 4161.448333,
+      "p99_ms": 4745.681301,
+      "max_ms": 4745.681301
+    },
+    "task.heartbeat": {
+      "n": 63,
+      "mean_ms": 32072.174677460316,
+      "p50_ms": 30009.992977,
+      "p95_ms": 60001.546344,
+      "p99_ms": 60001.67928,
+      "max_ms": 60001.706769
+    }
+  },
+  "request_errors": 173,
+  "errors": {
+    "fence settle 0: \"error sending request for url (http://127.0.0.1:18021/)\"": 2,
+    "task.create 500: Internal error: Storage error: pool timed out while waiting for": 91
+  },
+  "resources": [
+    {
+      "target": "pid:1153295",
+      "cpu_avg_pct": 1.1039877266644431,
+      "cpu_max_pct": 14.99866537375905,
+      "rss_avg_mb": 41.19463813110749,
+      "rss_max_mb": 69.45703125,
+      "samples": 307
+    }
+  ],
+  "notes": [
+    "5 Starter instances at once (aws-ap-southeast-1), instance 1 of 5, pool 256; step p256-c64"
+  ]
+}

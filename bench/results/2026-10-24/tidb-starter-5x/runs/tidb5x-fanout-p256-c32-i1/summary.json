@@ -1,0 +1,102 @@
+{
+  "run_id": "tidb5x-fanout-p256-c32-i1",
+  "system": "resonate",
+  "backend": "tidb5x-aws-ap-southeast-1-i1",
+  "workload": "fanout",
+  "params": {
+    "concurrency": 32,
+    "k": 8,
+    "n": 64,
+    "wake": "push"
+  },
+  "started": 64,
+  "completed": 16,
+  "failed": 48,
+  "retries": 69,
+  "wall_s": 358.910256826,
+  "throughput_wf_s": 0.04457938912500016,
+  "latency": {
+    "n": 16,
+    "mean_ms": 105556.0935728125,
+    "p50_ms": 111841.0928,
+    "p95_ms": 123593.08584,
+    "p99_ms": 137468.267392,
+    "max_ms": 137468.267392
+  },
+  "steps": {
+    "activity": {
+      "n": 356,
+      "mean_ms": 60804.75708402809,
+      "p50_ms": 60934.609031,
+      "p95_ms": 102466.915325,
+      "p99_ms": 113920.33608,
+      "max_ms": 128384.279179
+    }
+  },
+  "sleep_lateness": null,
+  "requests": {
+    "task.create": {
+      "n": 64,
+      "mean_ms": 8707.27179025,
+      "p50_ms": 9293.242449,
+      "p95_ms": 12209.88975,
+      "p99_ms": 12687.690386,
+      "max_ms": 12715.464771
+    },
+    "task.fence(promise.create)": {
+      "n": 527,
+      "mean_ms": 20233.4798338482,
+      "p50_ms": 18962.884375,
+      "p95_ms": 45702.959653,
+      "p99_ms": 60001.49307,
+      "max_ms": 60002.009799
+    },
+    "task.fence(promise.settle)": {
+      "n": 457,
+      "mean_ms": 33569.68403080525,
+      "p50_ms": 32053.290004,
+      "p95_ms": 60001.315147,
+      "p99_ms": 60002.356995,
+      "max_ms": 60003.24063
+    },
+    "task.fulfill": {
+      "n": 19,
+      "mean_ms": 9885.165632421053,
+      "p50_ms": 5663.687793,
+      "p95_ms": 30001.821421,
+      "p99_ms": 30004.244163,
+      "max_ms": 30004.244163
+    },
+    "task.heartbeat": {
+      "n": 105,
+      "mean_ms": 24331.385954838097,
+      "p50_ms": 22589.21019,
+      "p95_ms": 60001.78722,
+      "p99_ms": 60003.265354,
+      "max_ms": 60003.321489
+    }
+  },
+  "request_errors": 286,
+  "errors": {
+    "fence create 500: Internal error: Storage error: error communicating with databa": 18,
+    "fence create 500: Internal error: Storage error: pool timed out while waiting fo": 1,
+    "fence settle 0: \"error sending request for url (http://127.0.0.1:18021/)\"": 1,
+    "fence settle 500: Internal error: Storage error: error communicating with databa": 23,
+    "fence settle 500: Internal error: Storage error: pool timed out while waiting fo": 2,
+    "task.fulfill 409: Task version mismatch or invalid state": 1,
+    "task.fulfill 500: Internal error: Storage error: pool timed out while waiting fo": 2
+  },
+  "resources": [
+    {
+      "target": "pid:1153295",
+      "cpu_avg_pct": 0.7936344939145076,
+      "cpu_max_pct": 4.9921760370667885,
+      "rss_avg_mb": 45.096459348885794,
+      "rss_max_mb": 59.4140625,
+      "samples": 359
+    }
+  ],
+  "notes": [
+    "5 Starter instances at once (aws-ap-southeast-1), instance 1 of 5, pool 256; step p256-c32"
+  ]
+}

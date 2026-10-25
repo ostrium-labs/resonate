@@ -1,0 +1,76 @@
+{
+  "run_id": "temporal-gateway-resonate-postgres-fanout-1792935789",
+  "system": "temporal-gateway",
+  "backend": "resonate-postgres",
+  "workload": "fanout",
+  "params": {
+    "concurrency": 20,
+    "k": 8,
+    "n": 500
+  },
+  "started": 500,
+  "completed": 500,
+  "failed": 0,
+  "retries": 0,
+  "wall_s": 381.916667945,
+  "throughput_wf_s": 1.3091861182450546,
+  "latency": {
+    "n": 500,
+    "mean_ms": 15023.149976804001,
+    "p50_ms": 15730.323557,
+    "p95_ms": 24719.051661,
+    "p99_ms": 28158.813713,
+    "max_ms": 28511.793563
+  },
+  "steps": {
+    "activity": {
+      "n": 4000,
+      "mean_ms": 3981.1201173520003,
+      "p50_ms": 3461.617691,
+      "p95_ms": 8431.844776,
+      "p99_ms": 14430.95131,
+      "max_ms": 14969.260313
+    }
+  },
+  "sleep_lateness": null,
+  "requests": {},
+  "request_errors": 0,
+  "errors": {},
+  "resources": [
+    {
+      "target": "pid:1176751",
+      "cpu_avg_pct": 79.05900192006501,
+      "cpu_max_pct": 110.97540796057135,
+      "rss_avg_mb": 25.27899442257218,
+      "rss_max_mb": 33.06640625,
+      "samples": 381
+    },
+    {
+      "target": "pid:1176913",
+      "cpu_avg_pct": 6.891913114787713,
+      "cpu_max_pct": 38.9897458138202,
+      "rss_avg_mb": 17.648663057742784,
+      "rss_max_mb": 22.82421875,
+      "samples": 381
+    },
+    {
+      "target": "container:rbench-pg",
+      "cpu_avg_pct": 60.508484231661924,
+      "cpu_max_pct": 122.10740370739981,
+      "rss_avg_mb": 127.151687582021,
+      "rss_max_mb": 204.30859375,
+      "samples": 381
+    },
+    {
+      "target": "pid:1177244",
+      "cpu_avg_pct": 2.79103829337169,
+      "cpu_max_pct": 25.994659111344326,
+      "rss_avg_mb": 44.69436925853018,
+      "rss_max_mb": 70.59765625,
+      "samples": 381
+    }
+  ],
+  "notes": [
+    "Temporal Go SDK 1.49.0 through the Loams Temporal gateway (DX1, loams dx1-t9-binary loams-temporal-267f1f441), history store postgres; Resonate resonate-loams-main-4656e2fd on Postgres 17.10; both databases in one rbench-pg container, data on ext4 (/mnt/Projects)"
+  ]
+}

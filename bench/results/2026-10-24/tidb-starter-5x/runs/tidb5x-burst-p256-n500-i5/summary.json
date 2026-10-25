@@ -1,0 +1,98 @@
+{
+  "run_id": "tidb5x-burst-p256-n500-i5",
+  "system": "resonate",
+  "backend": "tidb5x-aws-ap-southeast-1-i5",
+  "workload": "burst",
+  "params": {
+    "concurrency": 500,
+    "n": 500,
+    "wake": "push"
+  },
+  "started": 500,
+  "completed": 62,
+  "failed": 438,
+  "retries": 3,
+  "wall_s": 277.283996866,
+  "throughput_wf_s": 0.22359746938429362,
+  "latency": {
+    "n": 62,
+    "mean_ms": 69783.46227251613,
+    "p50_ms": 68628.379587,
+    "p95_ms": 75209.32093,
+    "p99_ms": 75480.381393,
+    "max_ms": 75557.223964
+  },
+  "steps": {
+    "activity": {
+      "n": 63,
+      "mean_ms": 39337.91781931746,
+      "p50_ms": 43384.395969,
+      "p95_ms": 50531.145509,
+      "p99_ms": 50890.099022,
+      "max_ms": 53145.842466
+    }
+  },
+  "sleep_lateness": null,
+  "requests": {
+    "task.create": {
+      "n": 500,
+      "mean_ms": 28353.242004188,
+      "p50_ms": 30419.082434,
+      "p95_ms": 31500.411704,
+      "p99_ms": 40748.411873,
+      "max_ms": 42798.608799
+    },
+    "task.fence(promise.create)": {
+      "n": 145,
+      "mean_ms": 19833.944901503448,
+      "p50_ms": 24813.671495,
+      "p95_ms": 33934.767975,
+      "p99_ms": 36158.61646,
+      "max_ms": 37116.02196
+    },
+    "task.fence(promise.settle)": {
+      "n": 63,
+      "mean_ms": 12744.506423047618,
+      "p50_ms": 11226.855237,
+      "p95_ms": 16923.188444,
+      "p99_ms": 16987.083746,
+      "max_ms": 17001.923593
+    },
+    "task.fulfill": {
+      "n": 66,
+      "mean_ms": 10422.384248136364,
+      "p50_ms": 6360.695303,
+      "p95_ms": 30015.371072,
+      "p99_ms": 60003.208706,
+      "max_ms": 60003.62568
+    },
+    "task.heartbeat": {
+      "n": 111,
+      "mean_ms": 6186.466727963963,
+      "p50_ms": 3675.343436,
+      "p95_ms": 13366.741649,
+      "p99_ms": 60002.207979,
+      "max_ms": 60002.687731
+    }
+  },
+  "request_errors": 491,
+  "errors": {
+    "fence create 500: Internal error: Storage error: error communicating with databa": 55,
+    "fence create 500: Internal error: Storage error: pool timed out while waiting fo": 27,
+    "task.create 500: Internal error: Storage error: pool timed out while waiting for": 355,
+    "task.fulfill 500: Internal error: Storage error: pool timed out while waiting fo": 1
+  },
+  "resources": [
+    {
+      "target": "pid:1154236",
+      "cpu_avg_pct": 0.6724707873081943,
+      "cpu_max_pct": 11.996562852780485,
+      "rss_avg_mb": 34.20819895462633,
+      "rss_max_mb": 83.796875,
+      "samples": 281
+    }
+  ],
+  "notes": [
+    "5 Starter instances at once (aws-ap-southeast-1), instance 5 of 5, pool 256; step p256-n500"
+  ]
+}

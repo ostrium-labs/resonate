@@ -1,0 +1,19 @@
+rbench-temporal: mode=all workload=fanout n=500 k=8 l=5 sleep_ms=1000 concurrency=20 run=temporal-gateway-resonate-postgres-fanout-1792949374 address=127.0.0.1:17234 namespace=default task_queue=rbench
+rbench-temporal: starter: activity_timeout=10s wf_timeout=10m0s burst_start_workers=256
+rbench-temporal: worker: max_activities=200 max_workflow_tasks=200 activity_pollers=8 workflow_pollers=8 sticky_cache=10000
+rbench-temporal: otel: exporting spans to http://127.0.0.1:4317 as service rbench-temporal-gateway
+time=2026-10-25T23:03:37.613+05:30 level=WARN msg="Failed to poll for task." Namespace=default TaskQueue=rbench WorkerID=1471473@cachyos-x8664@ WorkerType=ActivityWorker Error="error communicating with database: expected to read 5 bytes, got 0 bytes at EOF"
+time=2026-10-25T23:03:47.816+05:30 level=WARN msg="Failed to poll for task." Namespace=default TaskQueue=rbench WorkerID=1471473@cachyos-x8664@ WorkerType=ActivityWorker Error="pool timed out while waiting for an open connection"
+panic: could not get last history event for workflow
+
+goroutine 22728 [running]:
+go.temporal.io/sdk/internal.(*workflowRunImpl).GetWithOptions(0xd06d6abd400, {0x10f7878, 0xd06d6d7ae40}, {0xdc7620, 0xd06d6b36ac0}, {0x1?})
+	go.temporal.io/sdk@v1.49.0/internal/internal_workflow_client.go:1939 +0xb8c
+go.temporal.io/sdk/internal.(*workflowRunImpl).Get(0x0?, {0x10f7878?, 0xd06d6d7ae40?}, {0xdc7620?, 0xd06d6b36ac0?})
+	go.temporal.io/sdk@v1.49.0/internal/internal_workflow_client.go:1929 +0x2a
+main.(*starter).await(0xd06d5b0a240, 0xd06d6515920)
+	github.com/ostrium-labs/resonate/bench/drivers/temporal-go/main.go:256 +0x79
+main.(*starter).runWorkload.func1(0xd06d6213270?)
+	github.com/ostrium-labs/resonate/bench/drivers/temporal-go/main.go:305 +0x92
+created by main.(*starter).runWorkload in goroutine 1
+	github.com/ostrium-labs/resonate/bench/drivers/temporal-go/main.go:302 +0x98

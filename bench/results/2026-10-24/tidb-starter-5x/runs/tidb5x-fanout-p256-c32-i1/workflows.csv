@@ -1,0 +1,65 @@
+wf_id,start_ns,end_ns,latency_ms,ok,retries,error
+tidb5x-fanout-p256-c32-i1-29,1792935689857674158,1792935737203804953,47346.131,false,0,fence create 500: Internal error: Storage error: error communicating with database: No route to host (os error 113)
+tidb5x-fanout-p256-c32-i1-12,1792935689676147418,1792935742834741371,53158.594,false,0,fence create 500: Internal error: Storage error: error communicating with database: No route to host (os error 113)
+tidb5x-fanout-p256-c32-i1-27,1792935689834884154,1792935742937324276,53102.440,false,0,fence create 500: Internal error: Storage error: error communicating with database: No route to host (os error 113)
+tidb5x-fanout-p256-c32-i1-28,1792935689846124145,1792935744136727865,54290.604,false,0,fence create 500: Internal error: Storage error: error communicating with database: No route to host (os error 113)
+tidb5x-fanout-p256-c32-i1-11,1792935689655485744,1792935744774424434,55118.939,false,0,fence create 500: Internal error: Storage error: error communicating with database: No route to host (os error 113)
+tidb5x-fanout-p256-c32-i1-9,1792935689632804248,1792935744783207647,55150.403,false,0,fence create 500: Internal error: Storage error: error communicating with database: No route to host (os error 113)
+tidb5x-fanout-p256-c32-i1-24,1792935689800920814,1792935760447188600,70646.268,false,0,fence create 500: Internal error: Storage error: error communicating with database: No route to host (os error 113)
+tidb5x-fanout-p256-c32-i1-0,1792935689534603008,1792935763287139456,73752.536,false,0,fence settle 500: Internal error: Storage error: error communicating with database: No route to host (os error 113)
+tidb5x-fanout-p256-c32-i1-19,1792935689744952452,1792935767747981200,78003.029,false,0,fence create 500: Internal error: Storage error: error communicating with database: No route to host (os error 113)
+tidb5x-fanout-p256-c32-i1-18,1792935689733678401,1792935772295164871,82561.486,false,1,fence settle 500: Internal error: Storage error: error communicating with database: No route to host (os error 113)
+tidb5x-fanout-p256-c32-i1-10,1792935689644299037,1792935772995377947,83351.079,false,0,fence settle 500: Internal error: Storage error: error communicating with database: No route to host (os error 113)
+tidb5x-fanout-p256-c32-i1-17,1792935689722191297,1792935773069157354,83346.966,false,1,fence settle 500: Internal error: Storage error: error communicating with database: No route to host (os error 113)
+tidb5x-fanout-p256-c32-i1-2,1792935689556098217,1792935774442880111,84886.782,false,0,fence settle 500: Internal error: Storage error: error communicating with database: No route to host (os error 113)
+tidb5x-fanout-p256-c32-i1-31,1792935689879784095,1792935774554018478,84674.234,false,0,fence create 500: Internal error: Storage error: error communicating with database: No route to host (os error 113)
+tidb5x-fanout-p256-c32-i1-14,1792935689716078066,1792935775161072203,85444.994,false,1,fence settle 500: Internal error: Storage error: error communicating with database: No route to host (os error 113)
+tidb5x-fanout-p256-c32-i1-21,1792935689767520052,1792935776145563103,86378.043,false,0,fence settle 500: Internal error: Storage error: error communicating with database: No route to host (os error 113)
+tidb5x-fanout-p256-c32-i1-20,1792935689756226852,1792935778101973196,88345.746,false,0,fence settle 500: Internal error: Storage error: error communicating with database: No route to host (os error 113)
+tidb5x-fanout-p256-c32-i1-4,1792935689578428671,1792935779249750457,89671.322,false,2,fence settle 500: Internal error: Storage error: error communicating with database: No route to host (os error 113)
+tidb5x-fanout-p256-c32-i1-15,1792935689716622009,1792935780244838351,90528.216,false,0,fence create 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-p256-c32-i1-8,1792935689622537054,1792935785432086610,95809.550,false,0,fence create 500: Internal error: Storage error: error communicating with database: No route to host (os error 113)
+tidb5x-fanout-p256-c32-i1-13,1792935689716074709,1792935785688525767,95972.451,false,1,fence settle 500: Internal error: Storage error: error communicating with database: No route to host (os error 113)
+tidb5x-fanout-p256-c32-i1-1,1792935689545325152,1792935785981436299,96436.111,false,0,task.fulfill 409: Task version mismatch or invalid state
+tidb5x-fanout-p256-c32-i1-30,1792935689869052523,1792935787260073331,97391.021,false,0,fence settle 500: Internal error: Storage error: error communicating with database: No route to host (os error 113)
+tidb5x-fanout-p256-c32-i1-53,1792935785981487967,1792935795007916906,9026.429,false,0,fence create 500: Internal error: Storage error: error communicating with database: No route to host (os error 113)
+tidb5x-fanout-p256-c32-i1-6,1792935689600005225,1792935796017494208,106417.489,false,0,fence settle 500: Internal error: Storage error: error communicating with database: No route to host (os error 113)
+tidb5x-fanout-p256-c32-i1-54,1792935787260122169,1792935800144025003,12883.903,false,0,fence create 500: Internal error: Storage error: error communicating with database: No route to host (os error 113)
+tidb5x-fanout-p256-c32-i1-16,1792935689716720758,1792935802809137202,113092.416,true,0,
+tidb5x-fanout-p256-c32-i1-3,1792935689566743622,1792935806080280924,116513.537,true,0,
+tidb5x-fanout-p256-c32-i1-23,1792935689789608736,1792935806081090947,116291.482,true,1,
+tidb5x-fanout-p256-c32-i1-58,1792935806081111740,1792935815048537609,8967.426,false,0,fence create 500: Internal error: Storage error: error communicating with database: No route to host (os error 113)
+tidb5x-fanout-p256-c32-i1-57,1792935806080310210,1792935815051399662,8971.089,false,0,fence create 500: Internal error: Storage error: error communicating with database: No route to host (os error 113)
+tidb5x-fanout-p256-c32-i1-7,1792935689611264223,1792935827079531615,137468.267,true,1,
+tidb5x-fanout-p256-c32-i1-22,1792935689777911448,1792935829479997488,139702.086,false,1,fence settle 500: Internal error: Storage error: error communicating with database: No route to host (os error 113)
+tidb5x-fanout-p256-c32-i1-32,1792935737203997292,1792935851154015997,113950.019,true,2,
+tidb5x-fanout-p256-c32-i1-55,1792935796017556224,1792935852124243837,56106.688,false,0,fence create 500: Internal error: Storage error: error communicating with database: No route to host (os error 113)
+tidb5x-fanout-p256-c32-i1-33,1792935742834899658,1792935852449700852,109614.801,true,2,
+tidb5x-fanout-p256-c32-i1-34,1792935742937367555,1792935859144310282,116206.943,false,4,fence settle 500: Internal error: Storage error: error communicating with database: No route to host (os error 113)
+tidb5x-fanout-p256-c32-i1-44,1792935774442933909,1792935862873625584,88430.692,false,0,fence settle 500: Internal error: Storage error: error communicating with database: No route to host (os error 113)
+tidb5x-fanout-p256-c32-i1-35,1792935744136777994,1792935864478161213,120341.383,false,5,fence settle 500: Internal error: Storage error: error communicating with database: No route to host (os error 113)
+tidb5x-fanout-p256-c32-i1-50,1792935780244889422,1792935867759948548,87515.059,false,0,fence settle 500: Internal error: Storage error: error communicating with database: No route to host (os error 113)
+tidb5x-fanout-p256-c32-i1-36,1792935744774458232,1792935868212766368,123438.308,true,3,
+tidb5x-fanout-p256-c32-i1-40,1792935767748049390,1792935868366967518,100618.918,false,1,fence settle 500: Internal error: Storage error: error communicating with database: No route to host (os error 113)
+tidb5x-fanout-p256-c32-i1-42,1792935772995451673,1792935868375408822,95379.957,false,0,fence settle 500: Internal error: Storage error: error communicating with database: No route to host (os error 113)
+tidb5x-fanout-p256-c32-i1-37,1792935744783276748,1792935868376362588,123593.086,true,4,
+tidb5x-fanout-p256-c32-i1-47,1792935776145626588,1792935868990038153,92844.412,false,0,fence settle 500: Internal error: Storage error: error communicating with database: No route to host (os error 113)
+tidb5x-fanout-p256-c32-i1-38,1792935760447292466,1792935870023150386,109575.858,true,2,
+tidb5x-fanout-p256-c32-i1-43,1792935773069253272,1792935870026897862,96957.645,false,0,fence settle 500: Internal error: Storage error: error communicating with database: No route to host (os error 113)
+tidb5x-fanout-p256-c32-i1-49,1792935779249866474,1792935871395040503,92145.174,false,0,fence settle 500: Internal error: Storage error: error communicating with database: No route to host (os error 113)
+tidb5x-fanout-p256-c32-i1-52,1792935785688582833,1792935872325342973,86636.760,false,0,fence create 500: Internal error: Storage error: error communicating with database: No route to host (os error 113)
+tidb5x-fanout-p256-c32-i1-51,1792935785432117941,1792935873081078875,87648.961,false,0,fence create 500: Internal error: Storage error: error communicating with database: No route to host (os error 113)
+tidb5x-fanout-p256-c32-i1-45,1792935774554070748,1792935874800828481,100246.758,true,0,
+tidb5x-fanout-p256-c32-i1-39,1792935763287240015,1792935875128332815,111841.093,true,2,
+tidb5x-fanout-p256-c32-i1-46,1792935775161126206,1792935875742906350,100581.780,true,0,
+tidb5x-fanout-p256-c32-i1-41,1792935772295282545,1792935877146346972,104851.064,true,1,
+tidb5x-fanout-p256-c32-i1-48,1792935778102051799,1792935878207223717,100105.172,true,0,
+tidb5x-fanout-p256-c32-i1-59,1792935827079585567,1792935882009535155,54929.950,true,0,
+tidb5x-fanout-p256-c32-i1-60,1792935829480048172,1792935882283953583,52803.905,true,0,
+tidb5x-fanout-p256-c32-i1-25,1792935689812264058,1792935973758322805,283946.059,false,7,"fence settle 0: ""error sending request for url (http://127.0.0.1:18021/)"""
+tidb5x-fanout-p256-c32-i1-26,1792935689823588893,1792935973759159615,283935.571,false,7,fence settle 500: Internal error: Storage error: error communicating with database: No route to host (os error 113)
+tidb5x-fanout-p256-c32-i1-5,1792935689588721026,1792935982424593084,292835.872,false,11,fence create 500: Internal error: Storage error: error communicating with database: No route to host (os error 113)
+tidb5x-fanout-p256-c32-i1-63,1792935982527745331,1792936022684512711,40156.767,false,0,fence settle 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-p256-c32-i1-61,1792935973760941660,1792936031702031566,57941.090,false,0,task.fulfill 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-p256-c32-i1-62,1792935973772298455,1792936037326514450,63554.216,false,0,task.fulfill 500: Internal error: Storage error: pool timed out while waiting for an open connection
+tidb5x-fanout-p256-c32-i1-56,1792935802809163920,1792936048444859834,245635.696,false,9,fence settle 500: Internal error: Storage error: pool timed out while waiting for an open connection
