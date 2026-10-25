@@ -121,6 +121,8 @@ opentelemetry = { version = "0.31", default-features = false, features = ["trace
 opentelemetry_sdk = { version = "0.31", default-features = false, features = ["trace", "testing"] }
 tracing = "0.1"
 tracing-opentelemetry = { version = "0.32", default-features = false }
-tracing-subscriber = { version = "0.3", default-features = false, features = ["registry", "std"] }
+tracing-subscriber = { version = "0.3", features = ["registry", "std", "env-filter"] }
 tower = { version = "0.5", features = ["util"] }
 http-body-util = "0.1"
+# `tests/poll_group.rs` runs consumers and a producer against a live process.
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time", "net"] }

@@ -12,6 +12,18 @@
 //! Workers connect via `GET /poll/{group}/{id}` and receive messages as
 //! Server-Sent Events; [`PollRegistry`] holds those connections open and
 //! pushes to them based on `poll://` address routing.
+//!
+//! # Groups with many consumers
+//!
+//! Any number of workers, or gateway replicas, may share a group. A message
+//! for `poll://any@<group>` goes to exactly one of them: one connection,
+//! picked at random, and the next one along if that one is full or has gone.
+//! A connection leaves its group the moment its stream ends, and whatever was
+//! queued on it unread is routed again. What has been written to the socket is
+//! the worker's: if it dies before acting on it, or the connection is
+//! half-open and the writes go nowhere, the task's retry or lease deadline on
+//! the server is what brings it back. There is no acknowledgement in this
+//! transport; acquiring the task is the acknowledgement.
 
 // axum comes from `resonate-plugin`, so a build has one of it — see that
 // crate's re-export for why.
@@ -120,9 +132,9 @@ impl Default for Config {
 
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, Weak};
-use tokio::sync::{mpsc, Mutex};
-use tracing::Instrument;
+use std::sync::{Arc, Mutex, MutexGuard, Weak};
+use tokio::sync::mpsc;
+use tokio::sync::mpsc::error::{TryRecvError, TrySendError};
 
 use resonate_plugin::types::Message;
 use resonate_plugin::{ResonateServer, ResonateWorker, Unavailable};
@@ -163,23 +175,100 @@ impl PollAddress {
     }
 }
 
-/// A single SSE connection to a worker.
+/// A message waiting on a connection, with the address it was routed by.
+///
+/// The address travels with it so that a message a consumer never read can be
+/// routed again when that consumer goes: see [`PollReceiver`]'s `Drop`.
+struct Queued {
+    address: Arc<PollAddress>,
+    payload: String,
+}
+
+/// A single SSE connection to a worker: the sending half of its stream.
 pub struct PollConnection {
     /// Unique identifier for this specific connection instance.
     pub conn_id: u64,
     pub id: String,
-    pub tx: mpsc::Sender<String>,
+    tx: mpsc::Sender<Queued>,
+}
+
+impl PollConnection {
+    /// Its stream has ended: the receiver is gone, and nothing sent here will
+    /// ever be read.
+    fn is_closed(&self) -> bool {
+        self.tx.is_closed()
+    }
+}
+
+/// The receiving half of a connection: what its SSE stream reads from.
+///
+/// Dropping it is how a connection leaves its group. That happens when the
+/// stream ends for any reason — the worker disconnected, a write failed, the
+/// transport stopped — and it happens synchronously, so there is no window in
+/// which the group still offers a connection nobody is reading. Whatever was
+/// queued here and not yet read is routed again by its original address: no
+/// consumer has seen it, so handing it to another is not a second delivery.
+pub struct PollReceiver {
+    registry: Weak<PollRegistry>,
+    group: String,
+    conn_id: u64,
+    rx: mpsc::Receiver<Queued>,
+}
+
+impl PollReceiver {
+    /// The next message, or `None` once the transport has dropped this
+    /// connection (on [`stop`](ResonateWorker::stop)).
+    pub async fn recv(&mut self) -> Option<String> {
+        self.rx.recv().await.map(|q| q.payload)
+    }
+
+    /// The next message if one is waiting.
+    pub fn try_recv(&mut self) -> Result<String, TryRecvError> {
+        self.rx.try_recv().map(|q| q.payload)
+    }
+}
+
+impl Drop for PollReceiver {
+    fn drop(&mut self) {
+        let Some(registry) = self.registry.upgrade() else {
+            return;
+        };
+        registry.remove(&self.group, self.conn_id);
+        // Closed first, so nothing new lands here while it is emptied.
+        self.rx.close();
+        let (mut moved, mut lost) = (0usize, 0usize);
+        while let Ok(q) = self.rx.try_recv() {
+            match registry.route(&q.address, q.payload) {
+                Ok(()) => moved += 1,
+                Err(_) => lost += 1,
+            }
+        }
+        if moved + lost > 0 {
+            tracing::info!(
+                group = %self.group,
+                conn_id = self.conn_id,
+                moved,
+                lost,
+                "Unread poll messages of a closed connection routed again"
+            );
+        }
+    }
 }
 
 /// Manages all active poll connections, grouped by group name.
 pub struct PollRegistry {
-    /// group -> [connection]
-    connections: Mutex<HashMap<String, Vec<Arc<PollConnection>>>>,
+    /// group -> [connection], oldest first.
+    ///
+    /// A plain mutex: it is never held across an `await`, and that is what
+    /// lets a [`PollReceiver`] leave its group from `Drop`.
+    connections: Mutex<HashMap<String, Vec<PollConnection>>>,
     /// Monotonically increasing counter for unique connection IDs.
     next_conn_id: AtomicU64,
     pub max_connections: usize,
     pub buffer_size: usize,
     pub keepalive_interval_ms: Option<u64>,
+    /// Handed to each [`PollReceiver`], so it can leave its group when dropped.
+    me: Weak<PollRegistry>,
     /// Held so a delivery failure can be reported back to the server (e.g.
     /// releasing the task instead of dropping it). Not used yet.
     ///
@@ -192,37 +281,36 @@ pub struct PollRegistry {
 impl PollRegistry {
     /// `Arc`, because the route registered for it holds one.
     pub fn new(server: Weak<dyn ResonateServer>, config: Config) -> Arc<Self> {
-        Arc::new(Self {
+        Arc::new_cyclic(|me| Self {
             connections: Mutex::new(HashMap::new()),
             next_conn_id: AtomicU64::new(1),
             max_connections: config.max_connections,
             buffer_size: config.buffer_size,
             keepalive_interval_ms: config.keepalive_interval_ms,
+            me: me.clone(),
             server,
         })
     }
 
+    fn lock(&self) -> MutexGuard<'_, HashMap<String, Vec<PollConnection>>> {
+        // Nothing done under the lock can leave the map half-written.
+        self.connections.lock().unwrap_or_else(|e| e.into_inner())
+    }
+
     /// How many connections are open, across every group.
     pub async fn connection_count(&self) -> usize {
-        self.connections
-            .lock()
-            .await
-            .values()
-            .map(|v| v.len())
-            .sum()
+        self.lock().values().map(|v| v.len()).sum()
     }
 
     /// Register a new connection. Returns its id and the receiving end of the
     /// message channel. Returns None if max connections exceeded.
     ///
-    /// The id rather than the connection itself, deliberately: the registry is
-    /// the sole owner of every [`PollConnection`], and therefore of every
-    /// sender. That is what makes [`stop`](ResonateWorker::stop) able to end
-    /// the streams by clearing the map — a caller holding an `Arc` of its own
-    /// would keep its sender alive and the stream would never see the channel
-    /// close. The id is all a caller needs, to deregister on disconnect.
-    pub async fn register(&self, group: &str, id: &str) -> Option<(u64, mpsc::Receiver<String>)> {
-        let mut conns = self.connections.lock().await;
+    /// The registry is the sole owner of every sender. That is what makes
+    /// [`stop`](ResonateWorker::stop) able to end the streams by clearing the
+    /// map: the receiver sees its channel close. The receiver, for its part,
+    /// takes the connection out of its group when it is dropped.
+    pub async fn register(&self, group: &str, id: &str) -> Option<(u64, PollReceiver)> {
+        let mut conns = self.lock();
 
         // Check total connection count
         let total: usize = conns.values().map(|v| v.len()).sum();
@@ -232,13 +320,14 @@ impl PollRegistry {
 
         let conn_id = self.next_conn_id.fetch_add(1, Ordering::Relaxed);
         let (tx, rx) = mpsc::channel(self.buffer_size);
-        let conn = Arc::new(PollConnection {
-            conn_id,
-            id: id.to_string(),
-            tx,
-        });
-
-        conns.entry(group.to_string()).or_default().push(conn);
+        conns
+            .entry(group.to_string())
+            .or_default()
+            .push(PollConnection {
+                conn_id,
+                id: id.to_string(),
+                tx,
+            });
 
         tracing::info!(
             group = %group,
@@ -248,12 +337,25 @@ impl PollRegistry {
             "Poll connection registered"
         );
 
-        Some((conn_id, rx))
+        let receiver = PollReceiver {
+            registry: self.me.clone(),
+            group: group.to_string(),
+            conn_id,
+            rx,
+        };
+        Some((conn_id, receiver))
     }
 
     /// Deregister a specific connection by its unique connection ID.
+    ///
+    /// Dropping its [`PollReceiver`] does this already; this is for a caller
+    /// that wants it gone while still holding the receiver.
     pub async fn deregister(&self, group: &str, conn_id: u64) {
-        let mut conns = self.connections.lock().await;
+        self.remove(group, conn_id);
+    }
+
+    fn remove(&self, group: &str, conn_id: u64) {
+        let mut conns = self.lock();
         if let Some(group_conns) = conns.get_mut(group) {
             group_conns.retain(|c| c.conn_id != conn_id);
             if group_conns.is_empty() {
@@ -263,75 +365,80 @@ impl PollRegistry {
         tracing::info!(group = %group, conn_id = conn_id, "Poll connection deregistered");
     }
 
-    /// Send a message to the appropriate connection(s) based on the poll address.
-    /// Returns true if the message was delivered, false otherwise.
+    /// Send a message to the appropriate connection based on the poll address.
+    /// Returns true if a connection accepted it.
     pub async fn send_poll(&self, address: &PollAddress, payload: &str) -> bool {
-        let conns = self.connections.lock().await;
+        self.route(&Arc::new(address.clone()), payload.to_string())
+            .is_ok()
+    }
 
-        let group_conns = match conns.get(&address.group) {
-            Some(c) if !c.is_empty() => c,
-            _ => {
-                tracing::warn!(
-                    group = %address.group,
-                    "Poll send failed: no active connections for group"
-                );
-                return false;
-            }
-        };
-
-        let delivered = match address.cast {
-            PollCast::Uni => {
-                // Must have an id, must match exactly
-                if let Some(target_id) = &address.id {
-                    if let Some(conn) = group_conns.iter().find(|c| &c.id == target_id) {
-                        conn.tx.try_send(payload.to_string()).is_ok()
-                    } else {
-                        tracing::warn!(
-                            group = %address.group,
-                            target_id = %target_id,
-                            "Poll send failed: target connection not found in group"
-                        );
-                        false
-                    }
-                } else {
-                    false
-                }
-            }
-            PollCast::Any => {
-                // Prefer specific id, fall back to random
-                if let Some(target_id) = &address.id {
-                    if let Some(conn) = group_conns.iter().find(|c| &c.id == target_id) {
-                        let ok = conn.tx.try_send(payload.to_string()).is_ok();
-                        if ok {
-                            tracing::debug!(
-                                group = %address.group,
-                                target_id = %target_id,
-                                "Poll message delivered to preferred connection"
-                            );
-                        }
-                        return ok;
-                    }
-                }
-                // Fall back to random selection to distribute work
-                let idx = fastrand::usize(..group_conns.len());
-                let ok = group_conns[idx].tx.try_send(payload.to_string()).is_ok();
-                if ok {
-                    tracing::debug!(
-                        group = %address.group,
-                        selected_id = %group_conns[idx].id,
-                        "Poll message delivered to random connection"
-                    );
-                }
-                ok
-            }
-        };
-        if !delivered {
+    /// Put `payload` on exactly one connection, or hand it back.
+    ///
+    /// The candidates, in the order they are tried:
+    ///
+    /// - `uni@group/id`: the connections for `id`, newest first. A worker
+    ///   that reconnected has its old connection in the group until the
+    ///   server notices it is gone, and the new one is the one being read.
+    /// - `any@group/id`: the same, then every other connection in the group.
+    /// - `any@group`: every connection, from a random one onwards. Random is
+    ///   what spreads the load; going on from there is what makes a full or
+    ///   closed connection cost a skip rather than the message.
+    ///
+    /// The first that accepts it has it, so a message is never on two
+    /// connections. A connection whose stream has ended is removed from the
+    /// group as soon as a send finds it.
+    fn route(&self, address: &Arc<PollAddress>, payload: String) -> Result<(), String> {
+        let mut conns = self.lock();
+        let Some(group) = conns.get_mut(&address.group) else {
             tracing::warn!(
                 group = %address.group,
-                "Poll message delivery failed: channel full or closed"
+                "Poll send failed: no active connections for group"
+            );
+            return Err(payload);
+        };
+        group.retain(|c| !c.is_closed());
+
+        let len = group.len();
+        let named = |c: &PollConnection| address.id.as_deref() == Some(c.id.as_str());
+        let mut order: Vec<usize> = (0..len).rev().filter(|&i| named(&group[i])).collect();
+        if address.cast == PollCast::Any && len > 0 {
+            let start = fastrand::usize(..len);
+            order.extend(
+                (0..len)
+                    .map(|k| (start + k) % len)
+                    .filter(|&i| !named(&group[i])),
             );
         }
-        delivered
+
+        let mut item = Queued {
+            address: Arc::clone(address),
+            payload,
+        };
+        for i in order {
+            match group[i].tx.try_send(item) {
+                Ok(()) => {
+                    tracing::debug!(
+                        group = %address.group,
+                        selected_id = %group[i].id,
+                        conn_id = group[i].conn_id,
+                        "Poll message delivered"
+                    );
+                    return Ok(());
+                }
+                Err(TrySendError::Full(q)) | Err(TrySendError::Closed(q)) => item = q,
+            }
+        }
+
+        if group.is_empty() {
+            conns.remove(&address.group);
+        }
+        tracing::warn!(
+            group = %address.group,
+            id = ?address.id,
+            connections = len,
+            "Poll message delivery failed: no connection could take it"
+        );
+        Err(item.payload)
     }
 }
 
@@ -353,7 +460,7 @@ impl ResonateWorker for PollRegistry {
     /// drains, there are none left for it to wait on.
     /// `a_drained_registry_ends_its_streams` says so.
     async fn stop(&self) -> Result<(), Unavailable> {
-        let mut conns = self.connections.lock().await;
+        let mut conns = self.lock();
         let n: usize = conns.values().map(|v| v.len()).sum();
         conns.clear();
         if n > 0 {
@@ -363,7 +470,7 @@ impl ResonateWorker for PollRegistry {
     }
 
     async fn process(&self, address: &str, msg: &Message) -> Result<(), Unavailable> {
-        let addr = PollAddress::parse(address)?;
+        let addr = Arc::new(PollAddress::parse(address)?);
         // Serialize via `Value` rather than straight from the struct. serde_json
         // has no `preserve_order`, so a `Value` map is a BTreeMap and emits keys
         // alphabetically — which is what SSE consumers have always received.
@@ -391,17 +498,13 @@ impl ResonateWorker for PollRegistry {
         }
         let body = serde_json::to_string(&value)
             .map_err(|e| Unavailable::new(format!("cannot serialize message: {e}")))?;
-        let delivered = PollRegistry::send_poll(self, &addr, &body)
-            .instrument(span.clone())
-            .await;
-        span.record("resonate.delivered", delivered);
-        if delivered {
-            Ok(())
-        } else {
-            Err(Unavailable::new(format!(
+        let routed = span.in_scope(|| self.route(&addr, body));
+        span.record("resonate.delivered", routed.is_ok());
+        routed.map_err(|_| {
+            Unavailable::new(format!(
                 "no poll connection accepted delivery for {address}"
-            )))
-        }
+            ))
+        })
     }
 }
 
@@ -447,10 +550,10 @@ async fn handle(
             // clears its registry, which drops the only sender. There is no
             // shutdown signal to keep in step with, because the thing that owns
             // the connection is the thing that ends it.
-            // Read before the stream takes the registry.
             let keepalive = registry.keepalive_interval_ms;
+            // Dropping the stream drops `rx`, and that is what takes this
+            // connection out of its group — see `PollReceiver`.
             let stream = async_stream::stream! {
-                let _guard = PollGuard { registry: registry.clone(), group: group.clone(), conn_id };
                 while let Some(msg) = rx.recv().await {
                     yield Ok::<_, std::convert::Infallible>(Event::default().data(msg));
                 }
@@ -475,23 +578,6 @@ async fn handle(
             )
                 .into_response()
         }
-    }
-}
-
-struct PollGuard {
-    registry: Arc<PollRegistry>,
-    group: String,
-    conn_id: u64,
-}
-
-impl Drop for PollGuard {
-    fn drop(&mut self) {
-        let registry = self.registry.clone();
-        let group = self.group.clone();
-        let conn_id = self.conn_id;
-        tokio::spawn(async move {
-            registry.deregister(&group, conn_id).await;
-        });
     }
 }
 
@@ -659,6 +745,261 @@ mod tests {
             rx.recv().await.is_none(),
             "the stream must see its channel close, or the gateway waits on it"
         );
+    }
+
+    // ─── Groups with many consumers ──────────────────────────────────────────
+    //
+    // Several workers (or gateway replicas) share one `poll://any@<group>`.
+    // What a group owes them: each message reaches one live consumer, a
+    // consumer that is gone stops being chosen at once, and a message is not
+    // given up on while another consumer could take it.
+
+    fn execute(task: &str) -> Message {
+        use resonate_plugin::types::{ExecuteMsg, ExecuteMsgData, ExecuteMsgTask, MessageHead};
+        Message::Execute(ExecuteMsg {
+            kind: "execute".to_string(),
+            head: MessageHead::new("http://server"),
+            data: ExecuteMsgData {
+                task: ExecuteMsgTask {
+                    id: task.to_string(),
+                    version: 0,
+                },
+            },
+        })
+    }
+
+    /// The task id an SSE frame carries.
+    fn task_of(frame: &str) -> String {
+        let v: serde_json::Value = serde_json::from_str(frame).expect("a frame is JSON");
+        v["data"]["task"]["id"]
+            .as_str()
+            .expect("an execute")
+            .to_string()
+    }
+
+    /// Everything waiting on a receiver right now.
+    fn drain_now(rx: &mut PollReceiver) -> Vec<String> {
+        let mut out = Vec::new();
+        while let Ok(frame) = rx.try_recv() {
+            out.push(task_of(&frame));
+        }
+        out
+    }
+
+    /// One `process` puts a message on one connection: never two, never none
+    /// while a consumer is there. And the choice is spread over the group.
+    #[tokio::test]
+    async fn an_anycast_reaches_exactly_one_consumer_and_the_load_is_spread() {
+        let poll = registry(Config {
+            buffer_size: 10_000,
+            ..Config::default()
+        });
+        let mut rxs = Vec::new();
+        for id in ["a", "b", "c"] {
+            rxs.push(poll.register("g", id).await.expect("capacity").1);
+        }
+        let n = 3_000;
+        for i in 0..n {
+            poll.process("poll://any@g", &execute(&format!("t{i}")))
+                .await
+                .expect("a live consumer takes it");
+        }
+        let mut seen = std::collections::HashSet::new();
+        for rx in &mut rxs {
+            let got = drain_now(rx);
+            // Uniform over three: 1000 each, and 800 is more than six
+            // standard deviations below that.
+            assert!(got.len() > 800, "one consumer got only {}", got.len());
+            for t in got {
+                assert!(seen.insert(t.clone()), "{t} delivered twice");
+            }
+        }
+        assert_eq!(seen.len(), n);
+    }
+
+    /// A consumer whose stream has ended is not chosen, and its message goes
+    /// to one that is still there rather than being reported undeliverable.
+    #[tokio::test]
+    async fn a_consumer_that_went_away_is_skipped_and_dropped() {
+        let poll = registry(Config::default());
+        let (_, mut live) = poll.register("g", "live").await.expect("capacity");
+        let (_, gone) = poll.register("g", "gone").await.expect("capacity");
+        drop(gone);
+
+        for i in 0..50 {
+            poll.process("poll://any@g", &execute(&format!("t{i}")))
+                .await
+                .expect("the live consumer takes every one");
+        }
+        assert_eq!(drain_now(&mut live).len(), 50);
+        assert_eq!(
+            poll.connection_count().await,
+            1,
+            "the closed connection is no longer in the group"
+        );
+    }
+
+    /// A full consumer is busy, not gone: the message goes to another, and
+    /// only when every consumer is full is it refused.
+    #[tokio::test]
+    async fn a_full_consumer_passes_the_message_on() {
+        let poll = registry(Config {
+            buffer_size: 1,
+            ..Config::default()
+        });
+        let (_, mut a) = poll.register("g", "a").await.expect("capacity");
+        let (_, mut b) = poll.register("g", "b").await.expect("capacity");
+        poll.process("poll://any@g", &execute("t0"))
+            .await
+            .expect("one takes it");
+        poll.process("poll://any@g", &execute("t1"))
+            .await
+            .expect("the other takes it");
+        poll.process("poll://any@g", &execute("t2"))
+            .await
+            .expect_err("both full: refused, and the retry deadline takes over");
+        let mut got = drain_now(&mut a);
+        got.extend(drain_now(&mut b));
+        got.sort();
+        assert_eq!(got, ["t0", "t1"]);
+    }
+
+    /// `any@g/<id>` prefers `<id>`, and falls back to the group when that
+    /// consumer cannot take it.
+    #[tokio::test]
+    async fn a_preferred_consumer_that_is_gone_falls_back_to_the_group() {
+        let poll = registry(Config::default());
+        let (_, mut other) = poll.register("g", "other").await.expect("capacity");
+        let (_, preferred) = poll.register("g", "preferred").await.expect("capacity");
+        drop(preferred);
+        poll.process("poll://any@g/preferred", &execute("t0"))
+            .await
+            .expect("another consumer takes it");
+        assert_eq!(drain_now(&mut other), ["t0"]);
+    }
+
+    /// Messages queued for a consumer that disconnects before reading them
+    /// were never seen by anyone, so they go to another consumer instead of
+    /// waiting out the server's retry deadline. Read ones are not resent.
+    #[tokio::test]
+    async fn what_a_dropped_consumer_had_not_read_goes_to_another() {
+        let poll = registry(Config::default());
+        let (_, mut stays) = poll.register("g", "stays").await.expect("capacity");
+        let (_, mut leaves) = poll.register("g", "leaves").await.expect("capacity");
+        for i in 0..5 {
+            poll.process("poll://any@g/leaves", &execute(&format!("t{i}")))
+                .await
+                .expect("queued for the preferred consumer");
+        }
+        assert_eq!(task_of(&leaves.recv().await.expect("one read")), "t0");
+        drop(leaves);
+        assert_eq!(drain_now(&mut stays), ["t1", "t2", "t3", "t4"]);
+    }
+
+    /// A unicast to an id that has reconnected reaches the newer connection:
+    /// the older one is the one more likely to be dead.
+    #[tokio::test]
+    async fn a_unicast_reaches_the_newest_connection_for_an_id() {
+        let poll = registry(Config::default());
+        let (_, mut older) = poll.register("g", "w").await.expect("capacity");
+        let (_, mut newer) = poll.register("g", "w").await.expect("capacity");
+        poll.process("poll://uni@g/w", &execute("t0"))
+            .await
+            .expect("delivered");
+        assert_eq!(drain_now(&mut newer), ["t0"]);
+        assert!(drain_now(&mut older).is_empty());
+    }
+
+    // ─── The same, over a real socket ────────────────────────────────────────
+
+    /// Serve the poll route on a loopback port, the way a gateway would.
+    async fn serve(poll: &Arc<PollRegistry>) -> std::net::SocketAddr {
+        let app = axum::Router::new()
+            .route(POLL_PATH, get(handle))
+            .with_state((Arc::clone(poll), None::<resonate_auth::AuthMode>));
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("bind");
+        let addr = listener.local_addr().expect("addr");
+        tokio::spawn(async move {
+            let _ = axum::serve(listener, app).await;
+        });
+        addr
+    }
+
+    /// Open `GET /poll/<group>/<id>` and read up to the end of the headers.
+    async fn connect(addr: std::net::SocketAddr, group: &str, id: &str) -> tokio::net::TcpStream {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        let mut s = tokio::net::TcpStream::connect(addr).await.expect("connect");
+        s.write_all(format!("GET /poll/{group}/{id} HTTP/1.1\r\nHost: t\r\n\r\n").as_bytes())
+            .await
+            .expect("request");
+        let mut head = Vec::new();
+        let mut byte = [0u8; 1];
+        while !head.ends_with(b"\r\n\r\n") {
+            s.read_exact(&mut byte).await.expect("headers");
+            head.push(byte[0]);
+        }
+        assert!(
+            head.starts_with(b"HTTP/1.1 200"),
+            "{}",
+            String::from_utf8_lossy(&head)
+        );
+        s
+    }
+
+    async fn wait_for_count(poll: &PollRegistry, want: usize) -> std::time::Duration {
+        let start = std::time::Instant::now();
+        while poll.connection_count().await != want {
+            assert!(
+                start.elapsed() < std::time::Duration::from_secs(5),
+                "still {} connections, want {want}",
+                poll.connection_count().await
+            );
+            tokio::time::sleep(std::time::Duration::from_millis(1)).await;
+        }
+        start.elapsed()
+    }
+
+    /// A consumer that closes its socket leaves the group without anything
+    /// being sent to it first: the server notices the end of the connection.
+    #[tokio::test]
+    async fn a_closed_socket_leaves_the_group_promptly() {
+        let poll = registry(Config::default());
+        let addr = serve(&poll).await;
+        let a = connect(addr, "g", "a").await;
+        let _b = connect(addr, "g", "b").await;
+        wait_for_count(&poll, 2).await;
+        drop(a);
+        let took = wait_for_count(&poll, 1).await;
+        assert!(
+            took < std::time::Duration::from_millis(500),
+            "took {took:?}"
+        );
+    }
+
+    /// A consumer that stops reading but keeps its socket open — hung, or on
+    /// the far side of a half-open connection — cannot be told from a slow
+    /// one. The server's writes still succeed into the socket buffer, so
+    /// what is sent there is lost to the transport; the task's retry
+    /// deadline is what brings it back. This pins that down.
+    #[tokio::test]
+    async fn a_consumer_that_stops_reading_still_looks_alive() {
+        let poll = registry(Config::default());
+        let addr = serve(&poll).await;
+        let _stalled = connect(addr, "g", "stalled").await;
+        wait_for_count(&poll, 1).await;
+        // Ten buffers' worth, in batches the stream can drain into the socket
+        // between: the channel never fills, because the kernel takes it all.
+        for batch in 0..10 {
+            for i in 0..100 {
+                poll.process("poll://any@g", &execute(&format!("t{batch}-{i}")))
+                    .await
+                    .expect("accepted: the transport cannot tell it is not read");
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+        }
+        assert_eq!(poll.connection_count().await, 1);
     }
 
     #[test]
