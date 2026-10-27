@@ -41,8 +41,12 @@ pub enum Error {
     /// this request: not an envelope, a mismatched `kind` or `corrId`, or a
     /// success payload of the wrong shape.
     Protocol { kind: String, message: String },
-    /// The client could not be built (a bad URL, a TLS backend error).
+    /// The client could not be built (a bad URL, a TLS backend error), or a
+    /// poll subscription could not be (an empty group or id).
     Build(String),
+    /// This client cannot do that over its transport: polling over
+    /// [`Client::local`](crate::Client::local).
+    Unsupported(String),
 }
 
 impl Error {
@@ -99,6 +103,7 @@ impl fmt::Display for Error {
             Error::Auth(m) => write!(f, "token source failed: {m}"),
             Error::Protocol { kind, message } => write!(f, "{kind}: bad answer: {message}"),
             Error::Build(m) => write!(f, "cannot build client: {m}"),
+            Error::Unsupported(m) => write!(f, "unsupported: {m}"),
         }
     }
 }

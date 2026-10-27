@@ -158,6 +158,39 @@ what happened.
 attempt. Over HTTP the token goes in `Authorization: Bearer`; in process it
 goes in `head.auth` when the request does not carry one.
 
+## Poll subscriptions
+
+A worker that cannot be dialled consumes `poll://` messages by dialling in.
+`client.poll(group, id)` opens `GET {endpoint}/poll/{group}/{id}` on the
+gateway (the route `resonate-transport-http-poll` registers) and returns a
+`Subscription` once the server has registered the connection, so every
+message routed after that reaches it.
+
+```rust
+let mut sub = client.poll("workers", "worker-1").await?;
+while let Some(event) = sub.recv().await {
+    match event {
+        PollEvent::Message(PollMessage::Execute { id, version, .. }) => {
+            client.task_acquire(&id, version, "worker-1", 30_000).await?;
+        }
+        PollEvent::Message(PollMessage::Unblock { promise, .. }) => { /* settled */ }
+        PollEvent::Message(PollMessage::Unknown { .. }) => {}
+        // Anything routed while the connection was down is lost: re-read
+        // what you wait on.
+        PollEvent::Reconnected { .. } => {}
+    }
+}
+```
+
+Opening retries within the client's policy, and a `4xx` (a refused token is
+`401`) is `Error::Rejected` with kind `poll`. After that, a connection that
+ends is reopened with jittered backoff (`PollOptions::reconnect`, 100 ms to
+5 s) until the subscription is dropped; the token source is read for every
+connection. `PollOptions::idle_timeout` treats a silent connection as dead,
+for servers that send keepalives. Dropping the subscription closes the
+connection, which takes it out of its group. HTTP only: `Client::local`
+answers `Error::Unsupported`.
+
 ## Correlation ids
 
 `Sequential` by default: `rc-<16 random hex>-<n>`. `.corr_ids(...)` takes any
