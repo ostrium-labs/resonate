@@ -58,6 +58,7 @@ mod client;
 mod corr;
 mod error;
 mod model;
+pub mod poll;
 mod retry;
 pub mod trace;
 mod transport;
@@ -68,6 +69,7 @@ pub use client::{Builder, Client};
 pub use corr::{CorrIds, Sequential};
 pub use error::Error;
 pub use model::*;
+pub use poll::{PollEvent, PollMessage, PollOptions, Subscription, TraceContext};
 pub use retry::RetryPolicy;
 
 pub use resonate_core::ResonateServer;

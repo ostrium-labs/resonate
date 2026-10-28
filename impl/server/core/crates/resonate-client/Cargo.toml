@@ -19,7 +19,8 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 # rustls only, so a client pulls in no system TLS library.
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
-tokio = { version = "1", features = ["time", "sync"] }
+# `rt`: a poll subscription reads its connection on a task of its own.
+tokio = { version = "1", features = ["time", "sync", "rt"] }
 
 [dev-dependencies]
 # The round trips run against a real server, in process and through the real
@@ -29,6 +30,8 @@ resonate-sql = { path = "../resonate-sql" }
 resonate-gateway-http = { path = "../resonate-gateway-http" }
 resonate-plugin = { path = "../resonate-plugin" }
 resonate-auth = { path = "../resonate-auth" }
+# The poll consumer's tests run against the real poll transport.
+resonate-transport-http-poll = { path = "../resonate-transport-http-poll" }
 validator = { workspace = true }
 base64 = "0.22"
-tokio = { version = "1", features = ["rt-multi-thread", "macros", "net"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "io-util"] }

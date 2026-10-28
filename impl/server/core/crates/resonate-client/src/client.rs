@@ -194,6 +194,43 @@ impl Client {
     }
 }
 
+impl Client {
+    /// Consume `poll://` messages for `group` as connection `id`: open
+    /// `GET {endpoint}/poll/{group}/{id}` on the gateway and return once the
+    /// server has registered it. See [`crate::poll`] for what the
+    /// [`Subscription`](crate::Subscription) yields and how it reconnects.
+    ///
+    /// Opening is retried within the client's [`RetryPolicy`]; a `4xx` (`401`
+    /// for a token the gateway refuses) is [`Error::Rejected`] with kind
+    /// `poll`. HTTP only: a client over [`Client::local`] answers
+    /// [`Error::Unsupported`], because a poll connection lives on a gateway.
+    pub async fn poll(&self, group: &str, id: &str) -> Result<crate::Subscription, Error> {
+        self.poll_with(group, id, crate::PollOptions::default())
+            .await
+    }
+
+    /// [`Client::poll`] with [`PollOptions`](crate::PollOptions).
+    pub async fn poll_with(
+        &self,
+        group: &str,
+        id: &str,
+        options: crate::PollOptions,
+    ) -> Result<crate::Subscription, Error> {
+        let Transport::Http(http) = &self.inner.transport else {
+            return Err(Error::Unsupported(
+                "poll needs an HTTP client: poll connections are served by a gateway".into(),
+            ));
+        };
+        let dialer = crate::poll::Dialer {
+            http: http.client.clone(),
+            url: crate::poll::poll_url(&http.url, group, id)?,
+            auth: self.inner.auth.clone(),
+        };
+        let open = options.open.unwrap_or(self.inner.retry);
+        crate::poll::subscribe(dialer, group, id, open, options).await
+    }
+}
+
 fn wall_ms() -> i64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
