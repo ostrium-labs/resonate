@@ -22,10 +22,25 @@
 //! alongside the operation's own result. The operation bodies never mention
 //! it — an emission is a side effect of a transition, and threading it through
 //! 21 return types would say otherwise.
+//!
+//! # Group commit
+//!
+//! One writer thread owns the connection. `transact` and `query` send it a
+//! job and wait for the answer; the writer drains what is queued (up to
+//! [`MAX_BATCH`] jobs), runs each in its own savepoint inside one
+//! transaction, commits once, and only then answers every job of the batch.
+//! A job that fails rolls back to its savepoint and leaves the others in. A
+//! commit that fails fails every job of the batch. So the batch is a serial
+//! order of the jobs (each sees the ones before it, as with one connection
+//! behind a lock), no caller hears of a write before the commit that holds
+//! it, and the durability settings (`synchronous`, the journal) are the same:
+//! what changes is one commit per batch instead of one per request, and no
+//! request thread blocking on the connection.
 
 use rusqlite::{params, Connection};
 use std::cell::RefCell;
-use std::sync::{Arc, Mutex};
+use std::panic::{catch_unwind, AssertUnwindSafe};
+use std::sync::mpsc;
 
 use async_trait::async_trait;
 use serde_json::Value;
@@ -94,11 +109,157 @@ pub fn init_db(conn: &mut Connection, migrate: bool) -> rusqlite::Result<()> {
 /// see [`crate::migrate`] for why the executor differs and nothing else does.
 static MIGRATOR: sqlx::migrate::Migrator = sqlx::migrate!("./migrations");
 
+/// The most jobs one commit carries.
+pub const MAX_BATCH: usize = 256;
+
 pub struct SqliteEngine {
-    conn: Arc<Mutex<Connection>>,
+    writer: mpsc::Sender<Box<dyn Job>>,
+    debug: bool,
+}
+
+/// What a job needs besides the connection.
+#[derive(Clone, Copy)]
+struct Ctx {
     task_retry_timeout: i64,
     preload_limit: u32,
-    debug: bool,
+}
+
+impl Ctx {
+    fn db<'a>(&self, conn: &'a Connection) -> SqliteDb<'a> {
+        SqliteDb {
+            conn,
+            task_retry_timeout: self.task_retry_timeout,
+            preload_limit: self.preload_limit,
+            emitted: RefCell::new(Vec::new()),
+            armed: RefCell::new(Vec::new()),
+        }
+    }
+}
+
+/// One `transact` or `query` call, queued for the writer thread.
+trait Job: Send {
+    /// Runs against the batch's open transaction. `false` asks the writer to
+    /// undo what this job wrote (roll back to its savepoint).
+    fn run(&mut self, conn: &Connection, ctx: Ctx) -> bool;
+    /// Answers the caller once the batch committed, or failed to.
+    fn finish(self: Box<Self>, committed: &Result<(), String>);
+}
+
+type Transacted<T> = (T, Vec<Outgoing>, Vec<Scheduled>);
+
+struct Write<F, T> {
+    f: F,
+    out: Option<StorageResult<Transacted<T>>>,
+    reply: tokio::sync::oneshot::Sender<StorageResult<Transacted<T>>>,
+}
+
+impl<F, T> Job for Write<F, T>
+where
+    F: FnMut(&SqliteDb) -> StorageResult<T> + Send + 'static,
+    T: Send + 'static,
+{
+    fn run(&mut self, conn: &Connection, ctx: Ctx) -> bool {
+        let db = ctx.db(conn);
+        let result = catch_unwind(AssertUnwindSafe(|| (self.f)(&db)));
+        let out = match result {
+            Ok(Ok(value)) => Ok((value, db.emitted.into_inner(), db.armed.into_inner())),
+            Ok(Err(e)) => Err(e),
+            Err(_) => Err(StorageError::Backend("the operation panicked".into())),
+        };
+        let ok = out.is_ok();
+        self.out = Some(out);
+        ok
+    }
+
+    fn finish(self: Box<Self>, committed: &Result<(), String>) {
+        let _ = self.reply.send(settle(self.out, committed));
+    }
+}
+
+struct Read<F, T> {
+    f: F,
+    out: Option<StorageResult<T>>,
+    reply: tokio::sync::oneshot::Sender<StorageResult<T>>,
+}
+
+impl<F, T> Job for Read<F, T>
+where
+    F: FnMut(&SqliteDb) -> StorageResult<T> + Send + 'static,
+    T: Send + 'static,
+{
+    fn run(&mut self, conn: &Connection, ctx: Ctx) -> bool {
+        let db = ctx.db(conn);
+        let out = catch_unwind(AssertUnwindSafe(|| (self.f)(&db)))
+            .unwrap_or_else(|_| Err(StorageError::Backend("the query panicked".into())));
+        let ok = out.is_ok();
+        self.out = Some(out);
+        ok
+    }
+
+    fn finish(self: Box<Self>, committed: &Result<(), String>) {
+        // A read saw the batch's earlier writes, so it fails with them.
+        let _ = self.reply.send(settle(self.out, committed));
+    }
+}
+
+/// A job's answer: its own error, else the commit's.
+fn settle<T>(out: Option<StorageResult<T>>, committed: &Result<(), String>) -> StorageResult<T> {
+    match (out, committed) {
+        (Some(Err(e)), _) => Err(e),
+        (Some(Ok(_)), Err(e)) | (None, Err(e)) => Err(StorageError::Backend(e.clone())),
+        (Some(Ok(value)), Ok(())) => Ok(value),
+        (None, Ok(())) => Err(StorageError::Backend("the operation did not run".into())),
+    }
+}
+
+/// The writer thread: one transaction per batch of queued jobs.
+fn writer(conn: Connection, jobs: mpsc::Receiver<Box<dyn Job>>, ctx: Ctx) {
+    while let Ok(first) = jobs.recv() {
+        let mut batch = vec![first];
+        while batch.len() < MAX_BATCH {
+            match jobs.try_recv() {
+                Ok(job) => batch.push(job),
+                Err(_) => break,
+            }
+        }
+        let committed = run_batch(&conn, &mut batch, ctx).map_err(|e| e.to_string());
+        for job in batch {
+            job.finish(&committed);
+        }
+    }
+}
+
+fn run_batch(conn: &Connection, batch: &mut [Box<dyn Job>], ctx: Ctx) -> rusqlite::Result<()> {
+    conn.execute_batch("BEGIN")?;
+    let result = (|| {
+        if let [job] = batch {
+            // One job: its failure rolls back the whole (one-job) transaction.
+            if !job.run(conn, ctx) {
+                conn.execute_batch("ROLLBACK")?;
+                return Ok(false);
+            }
+            return Ok(true);
+        }
+        for job in batch.iter_mut() {
+            conn.execute_batch("SAVEPOINT job")?;
+            if job.run(conn, ctx) {
+                conn.execute_batch("RELEASE job")?;
+            } else {
+                conn.execute_batch("ROLLBACK TO job; RELEASE job")?;
+            }
+        }
+        Ok(true)
+    })();
+    match result {
+        Ok(true) => conn.execute_batch("COMMIT").inspect_err(|_| {
+            let _ = conn.execute_batch("ROLLBACK");
+        }),
+        Ok(false) => Ok(()),
+        Err(e) => {
+            let _ = conn.execute_batch("ROLLBACK");
+            Err(e)
+        }
+    }
 }
 
 impl SqliteEngine {
@@ -111,21 +272,25 @@ impl SqliteEngine {
     ) -> rusqlite::Result<Self> {
         let mut conn = Connection::open(path)?;
         init_db(&mut conn, migrate)?;
-        Ok(Self {
-            conn: Arc::new(Mutex::new(conn)),
+        let (tx, rx) = mpsc::channel();
+        let ctx = Ctx {
             task_retry_timeout,
             preload_limit,
-            debug,
-        })
+        };
+        std::thread::Builder::new()
+            .name("resonate-sqlite".into())
+            .spawn(move || writer(conn, rx, ctx))
+            // Only a process out of threads fails here.
+            .expect("spawn the SQLite writer thread");
+        Ok(Self { writer: tx, debug })
     }
 
     /// Run one transition, and hand back what it emitted along with its result.
     ///
     /// The emissions are dropped if the transaction rolls back, which is the
     /// atomicity the port promises: state and messages commit together or not
-    /// at all. An outbox got that for free by being a table; here it is the
-    /// `?` on `commit` and the fact that `emitted` never leaves this scope on
-    /// the error path.
+    /// at all. The writer answers only after the batch holding this job
+    /// committed, so the emissions never leave before their state is in.
     async fn transact<F, T>(&self, f: F) -> StorageResult<(T, Vec<Outgoing>, Vec<Scheduled>)>
     where
         F: FnMut(&SqliteDb) -> StorageResult<T> + Send + 'static,
@@ -135,30 +300,23 @@ impl SqliteEngine {
             #[cfg(feature = "concurrency-stress")]
             tokio::task::yield_now().await;
 
-            let mut f = f;
-            let conn = Arc::clone(&self.conn);
-            let task_retry_timeout = self.task_retry_timeout;
-            let preload_limit = self.preload_limit;
-            tokio::task::block_in_place(|| {
-                // Use unwrap_or_else to recover from poisoned mutex (a prior panic
-                // while holding the lock). The connection itself is still valid.
-                let conn = conn.lock().unwrap_or_else(|e| e.into_inner());
-                let tx = conn.unchecked_transaction()?;
-                let db = SqliteDb {
-                    conn: &tx,
-                    task_retry_timeout,
-                    preload_limit,
-                    emitted: RefCell::new(Vec::new()),
-                    armed: RefCell::new(Vec::new()),
-                };
-                let result = f(&db)?;
-                let emitted = db.emitted.into_inner();
-                let armed = db.armed.into_inner();
-                tx.commit()?;
-                Ok((result, emitted, armed))
-            })
+            let (reply, answer) = tokio::sync::oneshot::channel();
+            self.submit(Box::new(Write {
+                f,
+                out: None,
+                reply,
+            }))?;
+            answer
+                .await
+                .unwrap_or_else(|_| Err(StorageError::Backend("the writer stopped".into())))
         })
         .await
+    }
+
+    fn submit(&self, job: Box<dyn Job>) -> StorageResult<()> {
+        self.writer
+            .send(job)
+            .map_err(|_| StorageError::Backend("the writer stopped".into()))
     }
 
     /// One operation: run it, and turn a storage failure into a response.
@@ -201,21 +359,15 @@ impl SqliteEngine {
             #[cfg(feature = "concurrency-stress")]
             tokio::task::yield_now().await;
 
-            let mut f = f;
-            let conn = Arc::clone(&self.conn);
-            let task_retry_timeout = self.task_retry_timeout;
-            let preload_limit = self.preload_limit;
-            tokio::task::block_in_place(|| {
-                let conn = conn.lock().unwrap_or_else(|e| e.into_inner());
-                let db = SqliteDb {
-                    conn: &conn,
-                    task_retry_timeout,
-                    preload_limit,
-                    emitted: RefCell::new(Vec::new()),
-                    armed: RefCell::new(Vec::new()),
-                };
-                f(&db)
-            })
+            let (reply, answer) = tokio::sync::oneshot::channel();
+            self.submit(Box::new(Read {
+                f,
+                out: None,
+                reply,
+            }))?;
+            answer
+                .await
+                .unwrap_or_else(|_| Err(StorageError::Backend("the writer stopped".into())))
         })
         .await
     }
@@ -2593,9 +2745,10 @@ impl<'a> SqliteDb<'a> {
     ///
     /// Postgres and MySQL run a statement here so the transition sees callbacks
     /// a concurrent transaction registered after its own snapshot opened. A
-    /// `SqliteEngine` holds one `Connection` behind a `Mutex`, so no other
-    /// transaction can have committed anything while this one runs — there is
-    /// nothing for a second look to find.
+    /// `SqliteEngine` has one `Connection`, owned by its writer thread, which
+    /// runs one job at a time, so no other transaction can have committed
+    /// anything while this one runs — there is nothing for a second look to
+    /// find.
     fn process_callbacks(&self, promise_id: &str, time: i64) -> StorageResult<()> {
         let _ = (promise_id, time);
         Ok(())
